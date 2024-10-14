@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition Attendance System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+</head>
+<body class="bg-sky-100">
+
+    <div class="container w-full m-auto flex flex-col items-center justify-center h-screen font-sans">
+        <a href="/user/faceRecognition" class="absolute top-0 right-0 w-fit p-1 px-4 border border-gray-300 bg-white rounded-full m-5 hover:bg-gray-100">Facial Recognition</a> 
+
+        <div class="flex w-auto shadow rounded-lg border bg-white m-auto">
+            <div class="flex w-96 px-5 py-6 flex-col bg-white bg-face-recognition bg-cover bg-center rounded-l-lg">
+                <h2 class="text-center text-3xl text-gray-300 mb-5">Facial Recognition Attendance System</h2>
+            </div>
+
+            <div class="flex w-96 px-8 py-6 flex-col bg-white rounded-r-lg">
+                <h2 class="text-center text-2xl mb-5">Login</h2>
+                <form method="post" action="{{ url_for('auth.login') }}">
+                    <div class="flex flex-col gap-2 mb-3">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Username" class="p-2 rounded-lg text-base outline-none border border-gray-200" autocomplete="off" value="{{ request.form.get('username', '') }}">
+                        {% if errors.username %}
+                            <span class="text-red-500">{{ errors.username }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-col gap-2 mb-3">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Password" class="p-2 rounded-lg text-base outline-none border border-gray-200" autocomplete="off">
+                        {% if errors.password %}
+                            <span class="text-red-500">{{ errors.password }}</span>
+                        {% endif %}
+                    </div>
+                    {% if errors.auth %}
+                        <div class="mb-3">
+                            <span class="text-red-500">{{ errors.auth }}</span>
+                        </div>
+                    {% endif %}
+                    {% if success_message %}
+                        <div class="mb-3">
+                            <span class="text-green-500">{{ success_message }}</span>
+                        </div>
+                        <script>
+                            setTimeout(function() {
+                                window.location.href = "{{ url_for('dashboard.dashboard') }}";
+                            }, 1000);
+                        </script>
+                    {% endif %}
+                    <div class="flex gap-2 mb-5">
+                        <input id="show-pass" type="checkbox">
+                        <label for="show-pass" class="text-sm">Show password</label>
+                    </div>
+                    <input type="submit" value="Login" name="submit" class="p-1 border bg-blue-600 w-full rounded text-white cursor-pointer hover:opacity-80">
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('show-pass').addEventListener('change', function() {
+            const passwordInput = document.getElementById('password');
+            passwordInput.type = this.checked ? 'text' : 'password';
+        });
+    </script>
+</body>
+</html>

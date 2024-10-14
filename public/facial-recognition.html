@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <script src="../node_modules/chart.js/dist/chart.umd.js"></script>
+</head>
+<body class="bg-sky-100 font-sans">
+    <main class="grid grid-cols-10 gap-10 p-10 h-screen">
+        <section class="col-span-4 flex flex-col gap-16 items-center p-5 2xl:py-20">
+            <div class="flex flex-col gap-5 w-full items-center px-5">
+                <h2 class="text-center font-semibold text-2xl">Facial Recognition</h2>
+                <div class="rounded w-96 h-96 bg-white">
+                    <img src="../static/img/face-scanner.png" alt="yow" class="object-cover w-full h-full rounded">
+                </div>
+            </div>
+            <div class="flex w-96 items-center rounded bg-white shadow">
+                <div class="flex flex-col w-2/5 p-2 gap-2 items-center justify-center">
+                    <img src="../static/img/attendance.png" alt="user" class="w-20">
+                    <p class="text-base text-green-500">Present</p>
+                </div>
+                <div class="flex-col w-3/5 p-5 px-0">
+                    <h5 class="text-lg font-semibold">Macalinao, Ian P.</h5>
+                    <p class="text-base">Grade 9 Santan</p>
+                    <p class="text-base">Pinoma National High School</p>
+                    <p class="text-base mt-5">09/28/2024 7:00 AM</p>
+                </div>
+            </div>
+        </section>
+        <section class="col-span-6 flex 2xl:p-5">
+            <div class="flex flex-col rounded bg-white w-full p-5 px-8 shadow overflowy-y-scroll">
+                <h2 class="text-center text-2xl font-semibold">Attendance Record and Statistics</h2>
+                <h5 class="text-lg font-semibold mt-5 mb-2">Statistics</h5>
+                <div class="grid grid-cols-2 gap-5">
+                    <div class="flex justify-between green-box rounded p-5">
+                        <p>Overall Attendance</p>
+                        <p>80%</p>
+                    </div>
+                    <div class="flex justify-between orange-box rounded p-5">
+                        <p>Overall Absences</p>
+                        <p>20%</p>
+                    </div>
+                </div>
+                <div class="p-4 mt-5">
+                    <h2>Monthly Data</h2>
+                    <canvas id="barChart"></canvas>
+                    <script>
+                        const labels = ['November', 'December', 'January', 'February', 'March', 'April'];
+                        const attendanceData = [20, 25, 15, 22, 18, 27]; 
+                        const absenceData = [10, 5, 15, 8, 12, 3]; 
+
+                        const data = {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Attendance Count',
+                                    data: attendanceData,
+                                    backgroundColor: '#8DD073', 
+                                    borderColor: '#8DD073',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Absence Count',
+                                    data: absenceData,
+                                    backgroundColor: '#F1C850',
+                                    borderColor: '#F1C850',
+                                    borderWidth: 1
+                                }
+                            ]
+                        };
+
+                        const config = {
+                            type: 'bar',
+                            data: data,
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        title: {
+                                            display: true,
+                                            text: 'Days',
+                                            font: {
+                                                size: 16,
+                                                weight: 'bold'
+                                            }
+                                        },
+                                        beginAtZero: true,
+                                        max: 30
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Months',
+                                            font: {
+                                                size: 16,
+                                                weight: 'bold'
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                        };
+
+                        const ctx = document.getElementById('barChart').getContext('2d');
+                        new Chart(ctx, config);
+                    </script>
+                </div>
+
+                <hr class="my-2">
+
+                <h5 class="text-lg font-semibold mt-5 mb-2">Previous Attendance</h5>
+                <table class="mb-5">
+                    <tr class="bg-gray-100">
+                        <th class="text-gray-600 border border-gray-300 p-1">Student Id</th>
+                        <th class="text-gray-600 border border-gray-300 p-1">Present (Yes/No)</th>
+                        <th class="text-gray-600 border border-gray-300 p-1">Date & Time</th>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">21-10887</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">Present</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">09/28/2024 7:00 AM</td>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">21-10887</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">Present</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">09/29/2024 7:30 AM</td>
+                    </tr>
+                </table>
+                <button class="rounded-full w-fit mx-auto p-2 px-4 text-sm border border-gray-300 hover:bg-gray-300">Load More</button>
+
+            </div>
+        </section>
+    </main>    
+</body>
+</html>

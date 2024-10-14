@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="../node_modules/chart.js/dist/chart.umd.js"></script>
+</head>
+<body class="flex h-screen bg-sky-100 font-sans">
+    <div class="w-64 bg-gray-800 text-white fixed top-0 bottom-0 p-4 flex flex-col">
+        <div>
+            <h2 class="text-xl font-bold mb-8 text-center">Admin</h2>
+            <ul class="flex flex-col gap-2">
+                <li>
+                    <a id="link-dashboard" class="p-2 rounded hover:bg-sky-600 cursor-pointer flex items-center gap-5" onclick="showPage('dashboard')">
+                        <img src="../static/img/dashboard.png" alt="dashboard" class="w-6">
+                        <p>Dashboard</p>
+                    </a>
+                </li>
+                <li>
+                    <a id="link-attendance" class="p-2 rounded hover:bg-sky-600 cursor-pointer flex items-center gap-5" onclick="showPage('attendance')">
+                        <img src="../static/img/records.png" alt="attendance" class="w-6">
+                        <p>Attendance Records</p>
+                    </a>
+                </li>
+                <li>
+                    <a id="link-activity" class="p-2 rounded hover:bg-sky-600 cursor-pointer flex items-center gap-5" onclick="showPage('activity')">
+                        <img src="../static/img/activity.png" alt="activity" class="w-6">
+                        <p>Activity Logs</p>
+                    </a>
+                </li>
+                <li>
+                    <a id="link-backup" class="p-2 rounded hover:bg-sky-600 cursor-pointer flex items-center gap-5" onclick="showPage('backup')">
+                        <img src="../static/img/backup.png" alt="backup" class="w-6">
+                        <p>Database Backup</p>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="mt-auto">
+            <a href="/" id="link-logout" class="p-2 rounded hover:bg-sky-600 cursor-pointer flex items-center gap-5">
+                <img src="../static/img/logout.png" alt="logout" class="w-6">
+                <p>Logout</p>
+            </a>
+        </div>
+    </div>
+    <div class="flex-1 ml-64">
+        <div class="bg-white shadow p-4 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-700">Facial Recognition Attendance System</h2>
+            <div class="flex gap-2">
+                <p class="text-base dark:text-gray-700" id="date"></p>
+                <p class="text-base dark:text-gray-700" id="time"></p>
+            </div>       
+        </div>
+        <div class="p-4 bg-sky-100">
+            <div id="dashboard" class="page hidden">
+                <div class="rounded p-4">
+                    <h2 class="text-xl font-semibold mb-5">Dashboard</h2>
+                    <div class="grid grid-cols-3 gap-4 mb-10">
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/users.png" alt="users"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Total Users</div>
+                            <div class="stat-value">1200</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/hat.png" alt="hat"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Students</div>
+                            <div class="stat-value">500</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/book.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Teachers</div>
+                            <div class="stat-value">50</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/staff.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Staffs</div>
+                            <div class="stat-value">25</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/attendance.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Total Attendance</div>
+                            <div class="stat-value">10002</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/absent.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Total Absences</div>
+                            <div class="stat-value">500</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/attendance.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Daily Attendance</div>
+                            <div class="stat-value">500</div>
+                        </div>
+                        <div class="stat shadow rounded bg-white">
+                            <div class="stat-figure text-secondary">
+                              <div class="avatar">
+                                <div class="w-16">
+                                  <img src="../static/img/absent.png" alt="book"/>
+                                </div>
+                              </div>
+                            </div>                           
+                            <div class="stat-title">Daily Absences</div>
+                            <div class="stat-value">40</div>
+                        </div>
+                        
+                    </div>
+                    <div class="bg-white rounded shadow p-4">
+                        <h2>Monthly Data</h2>
+                        <canvas id="barChart"></canvas>
+                        <script>
+                            const labels = ['November', 'December', 'January', 'February', 'March', 'April', 'May']; 
+                            const data = {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Attendance Count',
+                                    data: [1200, 1259, 3480, 3481, 2256, 2255, 2340],
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.2)',
+                                        'rgba(255, 159, 64, 0.2)',
+                                        'rgba(255, 205, 86, 0.2)',
+                                        'rgba(75, 192, 192, 0.2)',
+                                        'rgba(54, 162, 235, 0.2)',
+                                        'rgba(153, 102, 255, 0.2)',
+                                        'rgba(201, 203, 207, 0.2)'
+                                    ],
+                                    borderColor: [
+                                        'rgb(255, 99, 132)',
+                                        'rgb(255, 159, 64)',
+                                        'rgb(255, 205, 86)',
+                                        'rgb(75, 192, 192)',
+                                        'rgb(54, 162, 235)',
+                                        'rgb(153, 102, 255)',
+                                        'rgb(201, 203, 207)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            };
+                    
+                            const config = {
+                                type: 'bar',
+                                data: data,
+                                options: {
+                                    responsive: true,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true
+                                        }
+                                    }
+                                },
+                            };
+                    
+                            const ctx = document.getElementById('barChart').getContext('2d');
+                            new Chart(ctx, config);
+                        </script>
+                    </div>      
+                </div>       
+            </div>
+            <div id="attendance" class="page hidden">
+              <div class="rounded p-4">
+                <h2 class="text-xl font-semibold">Attendance Records</h2>
+                <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
+                  <div class="flex p-4 justify-between">
+                    <input type="text" placeholder="Search" class="input input-bordered w-full max-w-xs" />
+                    <div class="flex gap-2">
+                      <select title="sort-grade" class="select select-bordered w-full max-w-48">
+                        <option disabled selected>Grade Level</option>
+                        <option>Grade 7</option>
+                        <option>Grade 8</option>
+                        <option>Grade 9</option>
+                        <option>Grade 10</option>
+                        <option>Grade 11</option>
+                        <option>Grade 12</option>
+                      </select>
+                      <select title="sort-grade" class="select select-bordered w-full max-w-48">
+                        <option disabled selected>Section</option>
+                        <option>Section 1</option>
+                        <option>Section 2</option>
+                        <option>Section 3</option>     
+                      </select>
+                      <select title="sort-date" class="select select-bordered w-full max-w-48">
+                        <option disabled selected>Sort By</option>
+                        <option>Date Modified</option>
+                        <option>Name</option>
+                      </select>
+                    </div>  
+                  </div>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Grade & Section</th>
+                        <th>Date & Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th>2</th>
+                        <td>Cy Ganderton</td>
+                        <td>Present</td>
+                        <td>Grade 11 ICT-A</td>
+                        <td>09/17/2024 7:20 AM</td>
+                      </tr>
+                      <tr>
+                        <th>1</th>
+                        <td>Cy Ganderton</td>
+                        <td>Present</td>
+                        <td>Grade 11 ICT-A</td>
+                        <td>09/17/2024 7:00 AM</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>    
+              </div>     
+            </div>
+            <div id="activity" class="page hidden">
+              <div class="rounded p-4">
+                <h2 class="text-xl font-semibold">Activity Logs</h2>
+                <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
+                  <div class="flex p-4 justify-between">
+                    <input type="text" placeholder="Search" class="input input-bordered w-full max-w-xs" />
+                    <select title="sort-date" class="select select-bordered w-full max-w-48">
+                        <option disabled selected>Sort By</option>
+                        <option>Date Modified</option>
+                        <option>Name</option>
+                    </select>
+                  </div>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Activity</th>
+                        <th>Date & Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th>2</th>
+                        <td>Cy Ganderton</td>
+                        <td>Logged Out</td>
+                        <td>09/17/2024 10:20 pm</td>
+                      </tr>
+                      <tr>
+                        <th>1</th>
+                        <td>Cy Ganderton</td>
+                        <td>Logged In</td>
+                        <td>09/17/2024 10:00 pm</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>     
+            </div>
+            <div id="backup" class="page hidden">
+                <div class="rounded p-4">
+                    <h2 class="text-xl font-semibold">Database Backup</h2>
+                      <div class="flex items-center justify-center mt-5">
+                        <button class="py-2 px-5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-300 hover:text-gray-700" onclick="backupDatabase.showModal()">Backup Database</button>
+                          <dialog id="backupDatabase" class="modal">
+                            <div class="modal-box">
+                              <p class="py-4 text-center">Do you want to backup your database?</p>
+                              <div class="modal-action flex items-center justify-center">
+                                <form method="dialog" class="flex justify-between gap-5">
+                                  <button type="button" class="py-2 px-5 text-green-700 bg-white border border-green-500 rounded-lg hover:bg-green-500 hover:text-white" onclick="backupDatabase.close()">Yes</button>
+                                  <button type="button" class="py-2 px-5 text-rose-700 bg-white border border-rose-500 rounded-lg hover:bg-rose-500 hover:text-white" onclick="backupDatabase.close()">No</button>
+                                </form>
+                              </div>
+                            </div>
+                          </dialog>
+                      </div>
+                </div>     
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+            });
+            document.getElementById(pageId).classList.remove('hidden');
+
+            let newTitle = '';
+            switch(pageId) {
+                case 'dashboard':
+                    newTitle = 'Admin | Dashboard';
+                    break;
+                case 'attendance':
+                    newTitle = 'Admin | Attendance Records';
+                    break;
+                case 'activity':
+                    newTitle = 'Admin | Activity Logs';
+                    break;
+                case 'backup':
+                    newTitle = 'Admin | Database Backup';
+                    break;
+                default:
+                    newTitle = 'Admin | Dashboard';
+            }
+            document.title = newTitle;
+
+            document.querySelectorAll('.w-64 ul li a').forEach(link => {
+                link.classList.remove('bg-sky-600');
+            });
+            document.getElementById('link-' + pageId).classList.add('bg-sky-600');
+        }
+
+        showPage('dashboard');
+
+        function updateDateTime() {
+            const now = new Date();
+            const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
+            const optionsTime = { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: true 
+            };
+
+            const formattedDate = now.toLocaleDateString(undefined, optionsDate);
+            const formattedTime = now.toLocaleTimeString(undefined, optionsTime);
+
+            document.getElementById('date').textContent = formattedDate;
+            document.getElementById('time').textContent = formattedTime;
+        }
+
+        setInterval(updateDateTime, 1000);
+
+        updateDateTime();
+    </script>
+</body>
+</html>
