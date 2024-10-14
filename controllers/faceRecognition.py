@@ -136,8 +136,13 @@ def get_all_users():
     users_list = [dict(user) for user in users]
     return jsonify(users_list)
 
+# Initialize a dictionary to store the last insertion time for each user
+last_insertion_times = {}
+
 def generate_frames():
     global last_insert_time, detected_info
+    insert_interval = timedelta(minutes=5)  # Set your desired interval here
+
     while camera.running:
         frame = camera.get_frame()
         if frame is None:
@@ -149,6 +154,8 @@ def generate_frames():
         faces = embedder.extract(rgb_frame, threshold=0.95)
 
         detected_info["name"] = "Unknown"  # Default to Unknown
+        detected_info["datetime"] = None  # Default to None
+
         for res in faces:
             face_embedding = res['embedding']
             face_embedding = np.array(face_embedding).reshape(1, -1)
@@ -157,36 +164,66 @@ def generate_frames():
             prediction = clf.predict(face_embedding)
             predicted_class_index = prediction[0]
 
-            # Get the confidence score (distance from the decision boundary)
+            # Get the confidence score
             confidence_scores = clf.decision_function(face_embedding)
             confidence = confidence_scores[0][predicted_class_index] if len(confidence_scores.shape) > 1 else confidence_scores[0]
 
-            # Set confidence threshold (tweak as necessary)
-            confidence_threshold = 0.5  # Adjust based on your needs
-            distance_threshold = 1.0  # Distance threshold for unknown
+            # Set confidence threshold
+            confidence_threshold = 0.5  # Adjust as needed
 
             if confidence < confidence_threshold:
                 name = "Unknown"
             else:
-                # Get the actual name
                 name = label_encoder.inverse_transform([predicted_class_index])[0]
-
-            # Optionally compute a distance from the predicted embedding to the known ones
-            # Here, you would need to implement logic to calculate this distance
 
             # Draw bounding box and name
             x, y, w, h = res['box']
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
 
-            # Update detected info
-            detected_info["name"] = name if name != "Unknown" else detected_info["name"]
+            # Current date and time
+            now = datetime.now()
+            entry_datetime = now.strftime("%Y-%m-%d %I:%M:%S %p")  # 12-hour format with AM/PM
+
+            # Retrieve user data from the database if the name is recognized
+            retrieved_name, _ = get_user_data(name)  # Ignore old datetime from DB
+            if retrieved_name:
+                # Retrieve the latest entry date and time from the database
+                latest_entry_datetime = get_latest_entry_datetime(retrieved_name)
+                detected_info["name"] = retrieved_name
+                detected_info["datetime"] = latest_entry_datetime  # Set the latest time
+
+                # Check the last insertion time for the recognized user
+                if retrieved_name not in last_insertion_times:
+                    last_insertion_times[retrieved_name] = now - insert_interval  # Set initial time
+                
+                # Insert data into the database if the interval has passed
+                if now - last_insertion_times[retrieved_name] >= insert_interval:
+                    period = now.strftime("%p")  # e.g., AM/PM
+                    insert_data(retrieved_name, entry_datetime, period)
+                    last_insertion_times[retrieved_name] = now  # Update last insertion time
+            else:
+                detected_info["name"] = "Unknown"
+                detected_info["datetime"] = None
 
         # Encode and yield the frame
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+def get_latest_entry_datetime(name):
+    try:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT entry_datetime FROM users WHERE name = ? ORDER BY entry_datetime DESC LIMIT 1", (name,))
+        result = c.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error fetching latest entry datetime: {e}")
+        return None
+    finally:
+        conn.close()
 
 @faceRecognition_bp.route('/video_feed')
 def video_feed():
