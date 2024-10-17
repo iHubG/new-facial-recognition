@@ -8,6 +8,305 @@ import numpy as np
 from keras_facenet import FaceNet
 from sklearn import svm
 import os
+import dlib
+
+# Create a Blueprint for face recognition
+faceRecognition_bp = Blueprint('faceRecognition', __name__)
+
+# Initialize variables for last insertion time and interval
+insert_interval = timedelta(minutes=5)
+detected_info = {"name": None, "datetime": None, "grade_level": None, "section": None}  # Store additional info
+
+# Load the trained SVM classifier and label encoder
+with open('svm_classifier_facenet.pkl', 'rb') as f:
+    clf = pickle.load(f)
+
+with open('label_encoder.pkl', 'rb') as f:
+    label_encoder = pickle.load(f)
+
+# Initialize FaceNet
+embedder = FaceNet()
+
+def get_db_connection():
+    conn = sqlite3.connect('face-recognition.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def insert_data(name, entry_datetime, period, grade_level, section):
+    try:
+        print(f"Inserting data: {name}, {entry_datetime}, {period}, {grade_level}, {section}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO users (name, entry_datetime, period, grade_level, section) VALUES (?, ?, ?, ?, ?)", 
+                  (name, entry_datetime, period, grade_level, section))
+        conn.commit()
+        print(f"Successfully inserted data for {name}.")
+    except Exception as e:
+        print(f"Error inserting data: {e}")
+    finally:
+        conn.close()
+
+def get_user_data(name):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT grade_level, section FROM users WHERE name = ?", (name,))
+        result = c.fetchone()
+        return {
+            'grade_level': result[0],
+            'section': result[1]
+        } if result else None
+    except Exception as e:
+        print(f"Error fetching user data: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_latest_entry_datetime(name):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Retrieve the latest entry_datetime for the recognized name
+        c.execute("SELECT entry_datetime FROM users WHERE name = ? ORDER BY entry_datetime DESC LIMIT 1", (name,))
+        result = c.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error fetching latest entry datetime: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+class VideoCamera:
+    def __init__(self):
+        self.video = None
+        self.frame = None
+        self.running = False
+        self.lock = threading.Lock()
+
+    def start(self):
+        if not self.running:
+            self.video = cv2.VideoCapture(0)
+            self.running = True
+            self.thread = threading.Thread(target=self.update_frame, daemon=True)
+            self.thread.start()
+            print("Camera started.")
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            self.thread.join()  # Wait for the thread to finish
+            self.video.release()
+            print("Camera turned off.")
+
+    def update_frame(self):
+        while self.running:
+            success, frame = self.video.read()
+            if success:
+                with self.lock:
+                    self.frame = frame
+            else:
+                print("Failed to capture frame")
+
+    def get_frame(self):
+        with self.lock:
+            return self.frame
+
+# Camera instance
+camera = VideoCamera()
+camera_running = False
+
+@faceRecognition_bp.route('/faceRecognition', methods=['GET', 'POST'])
+def dashboard():
+    global camera_running
+    if request.method == 'POST':
+        if not camera_running:
+            camera.start()
+            camera_running = True
+    return render_template('views/faceRecognition.html', camera_running=camera_running)
+
+@faceRecognition_bp.route('/toggle_camera', methods=['POST'])
+def toggle_camera():
+    global camera_running
+    if camera_running:
+        camera.stop()
+    else:
+        camera.start()
+    camera_running = not camera_running
+    return redirect(url_for('faceRecognition.dashboard'))
+
+@faceRecognition_bp.route('/get_all_users', methods=['GET'])
+def get_all_users():
+    conn = get_db_connection()
+    users = conn.execute('SELECT * FROM users').fetchall()
+    conn.close()
+    
+    users_list = [dict(user) for user in users]
+    return jsonify(users_list)
+
+# Initialize a dictionary to store the last insertion time for each user
+last_insertion_times = {}
+
+# Initialize dlib's face detector and shape predictor
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+
+# Eye landmark points for detecting blinks
+LEFT_EYE_POINTS = list(range(36, 42))
+RIGHT_EYE_POINTS = list(range(42, 48))
+
+# Helper function to calculate the eye aspect ratio (EAR)
+def eye_aspect_ratio(eye):
+    A = np.linalg.norm(eye[1] - eye[5])
+    B = np.linalg.norm(eye[2] - eye[4])
+    C = np.linalg.norm(eye[0] - eye[3])
+    ear = (A + B) / (2.0 * C)
+    return ear
+
+def is_blinking(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = detector(gray)
+
+    if len(faces) == 0:
+        return False  # No face detected
+
+    for face in faces:
+        landmarks = predictor(gray, face)
+
+        left_eye = np.array([(landmarks.part(point).x, landmarks.part(point).y) for point in LEFT_EYE_POINTS])
+        right_eye = np.array([(landmarks.part(point).x, landmarks.part(point).y) for point in RIGHT_EYE_POINTS])
+
+        left_ear = eye_aspect_ratio(left_eye)
+        right_ear = eye_aspect_ratio(right_eye)
+
+        # Set threshold for blinking based on EAR
+        blink_threshold = 0.20
+
+        if left_ear < blink_threshold and right_ear < blink_threshold:
+            return True  # Blink detected
+
+    return False  # No blink detected
+
+def generate_frames():
+    global detected_info
+    last_valid_detection = detected_info.copy()
+
+    while camera.running:
+        frame = camera.get_frame()
+        if frame is None:
+            continue
+
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Check if a blink is detected to validate live face
+        if is_blinking(frame):
+            faces = embedder.extract(rgb_frame, threshold=0.95)
+
+            current_detection = {
+                "name": "Unknown",
+                "datetime": None,
+                "grade_level": None,
+                "section": None
+            }
+
+            # Check if there are any detected faces
+            if len(faces) > 0:
+                # Process only the first detected face
+                res = faces[0]  # Focus on the first face detected
+                face_embedding = res['embedding']
+                face_embedding = np.array(face_embedding).reshape(1, -1)
+
+                # Get the probability predictions using SVM
+                probabilities = clf.predict_proba(face_embedding)
+
+                # Get the class with the highest probability
+                max_prob_index = np.argmax(probabilities)
+                max_prob = probabilities[0][max_prob_index]
+
+                # Set confidence threshold for unknown faces (e.g., 0.5)
+                confidence_threshold = 0.50
+
+                print(f"Max Probability: {max_prob}, Predicted Class Index: {max_prob_index}, Predicted Class: {label_encoder.inverse_transform([max_prob_index])[0]}")
+
+                if max_prob < confidence_threshold:
+                    name = "Unknown"
+                    box_color = (0, 0, 255)  # Red color for unknown
+                else:
+                    name = label_encoder.inverse_transform([max_prob_index])[0]
+                    box_color = (0, 255, 0)  # Green color for recognized faces
+
+                # Draw bounding box and name on the frame
+                x, y, w, h = res['box']
+                cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)  # Use the selected color
+                cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+
+                # Current date and time
+                now = datetime.now()
+                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")
+
+                if name != "Unknown":
+                    current_detection["name"] = name
+
+                    grade_level, section = None, None
+                    for root, dirs, files in os.walk('datasets'):
+                        for dir in dirs:
+                            section_path = os.path.join(root, dir)
+                            for student_file in os.listdir(section_path):
+                                if name in student_file:
+                                    grade_level = os.path.basename(os.path.dirname(section_path))
+                                    section = dir
+                                    break
+                            if grade_level and section:
+                                break
+
+                    current_detection["grade_level"] = grade_level or "Unknown"
+                    current_detection["section"] = section or "Unknown"
+                    current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")
+
+                    # Inserting data into database based on interval
+                    if name not in last_insertion_times:
+                        last_insertion_times[name] = now - insert_interval
+
+                    if now - last_insertion_times[name] >= insert_interval:
+                        insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        last_insertion_times[name] = now
+
+                # Update detected_info or maintain last valid detection
+                detected_info.update(current_detection)
+                last_valid_detection = current_detection
+
+            else:
+                # Handle the case where no faces are detected
+                detected_info.update(last_valid_detection)  # Maintain last valid detection
+
+        else:
+            # If no blink is detected, skip further processing and mark as "No Blink Detected"
+            detected_info.update({"name": "No Blink Detected", "datetime": None, "grade_level": None, "section": None})
+
+        # Encode frame to JPEG format for streaming
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@faceRecognition_bp.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@faceRecognition_bp.route('/get_detected_info')
+def get_detected_info():
+    return jsonify(detected_info)
+'''
+from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for
+import cv2
+import sqlite3
+from datetime import datetime, timedelta
+import threading
+import pickle
+import numpy as np
+from keras_facenet import FaceNet
+from sklearn import svm
+import os
 
 # Create a Blueprint for face recognition
 faceRecognition_bp = Blueprint('faceRecognition', __name__)
@@ -257,7 +556,7 @@ def video_feed():
 @faceRecognition_bp.route('/get_detected_info')
 def get_detected_info():
     return jsonify(detected_info)
-
+'''
 '''
 from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for
 import cv2
