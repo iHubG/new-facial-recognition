@@ -9,6 +9,15 @@ from keras_facenet import FaceNet
 from sklearn import svm
 import os
 import dlib
+import time
+import logging
+
+# Initialize logging
+logging.basicConfig(filename='face_recognition.log', level=logging.INFO)
+
+# Example of logging predictions
+def log_prediction(image_path, expected, predicted):
+    logging.info(f"Image: {image_path}, Expected: {expected}, Predicted: {predicted}")
 
 # Create a Blueprint for face recognition
 faceRecognition_bp = Blueprint('faceRecognition', __name__)
@@ -187,9 +196,32 @@ def is_blinking(frame):
 
     return False  # No blink detected
 
+# Add this import for the moving average smoothing
+from collections import deque
+
+# Initialize parameters for smoothing the bounding box
+bounding_box_history = deque(maxlen=5)  # Store the last 5 bounding box positions
+
+def smooth_bounding_box(current_box):
+    """Smooth the bounding box position."""
+    bounding_box_history.append(current_box)  # Add current box to history
+    if len(bounding_box_history) > 0:
+        # Calculate the average box coordinates
+        avg_x = int(np.mean([box[0] for box in bounding_box_history]))
+        avg_y = int(np.mean([box[1] for box in bounding_box_history]))
+        avg_w = int(np.mean([box[2] for box in bounding_box_history]))
+        avg_h = int(np.mean([box[3] for box in bounding_box_history]))
+        return (avg_x, avg_y, avg_w, avg_h)
+    return current_box
+
+# Dictionary to store recognized users for the session
+recognized_users = {}
+
 def generate_frames():
     global detected_info
     last_valid_detection = detected_info.copy()
+    last_recognition_time = time.time()  # Initialize the last recognition time
+    recognition_cooldown = 2  # Set cooldown period in seconds
 
     while camera.running:
         frame = camera.get_frame()
@@ -206,47 +238,58 @@ def generate_frames():
                 "name": "Unknown",
                 "datetime": None,
                 "grade_level": None,
-                "section": None
+                "section": None,
+                "confidence": 0.0  # To store the confidence score
             }
 
-            # Check if there are any detected faces
             if len(faces) > 0:
-                # Process only the first detected face
-                res = faces[0]  # Focus on the first face detected
-                face_embedding = res['embedding']
-                face_embedding = np.array(face_embedding).reshape(1, -1)
+                current_time = time.time()  # Get the current time
 
-                # Get the probability predictions using SVM
+                # Process the first detected face
+                res = faces[0]
+                face_embedding = np.array(res['embedding']).reshape(1, -1)
+
+                # Predict using SVM and get the probability predictions
                 probabilities = clf.predict_proba(face_embedding)
-
-                # Get the class with the highest probability
                 max_prob_index = np.argmax(probabilities)
                 max_prob = probabilities[0][max_prob_index]
 
                 # Set confidence threshold for unknown faces (e.g., 0.5)
-                confidence_threshold = 0.50
+                confidence_threshold = 0.5
 
-                print(f"Max Probability: {max_prob}, Predicted Class Index: {max_prob_index}, Predicted Class: {label_encoder.inverse_transform([max_prob_index])[0]}")
+                name = label_encoder.inverse_transform([max_prob_index])[0] if max_prob >= confidence_threshold else "Unknown"
 
-                if max_prob < confidence_threshold:
-                    name = "Unknown"
-                    box_color = (0, 0, 255)  # Red color for unknown
+                # Prevent showing "Unknown" after a successful recognition
+                if name != "Unknown":
+                    recognized_users[tuple(res['box'])] = name  # Track the recognized user
+                    last_recognition_time = current_time  # Update recognition time
                 else:
-                    name = label_encoder.inverse_transform([max_prob_index])[0]
-                    box_color = (0, 255, 0)  # Green color for recognized faces
+                    # Check if this face was recognized before (within the session)
+                    if tuple(res['box']) in recognized_users:
+                        name = recognized_users[tuple(res['box'])]  # Use previously recognized name
 
-                # Draw bounding box and name on the frame
+                # Smooth the bounding box coordinates
                 x, y, w, h = res['box']
-                cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)  # Use the selected color
+                smoothed_box = smooth_bounding_box((x, y, w, h))
+                x, y, w, h = smoothed_box
+
+                box_color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)  # Green for known, Red for unknown
+                cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
                 cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+
+                # Show accuracy rate at the bottom of the box formatted as a percentage
+                accuracy_percentage = max_prob * 100  # Convert to percentage
+                cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
                 # Current date and time
                 now = datetime.now()
-                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")
+                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")  # 12-hour format with AM/PM
 
                 if name != "Unknown":
                     current_detection["name"] = name
+                    current_detection["confidence"] = max_prob
 
+                    # Look for the user's corresponding folder
                     grade_level, section = None, None
                     for root, dirs, files in os.walk('datasets'):
                         for dir in dirs:
@@ -259,35 +302,32 @@ def generate_frames():
                             if grade_level and section:
                                 break
 
-                    current_detection["grade_level"] = grade_level or "Unknown"
-                    current_detection["section"] = section or "Unknown"
-                    current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")
+                    current_detection["grade_level"] = grade_level if grade_level else "Unknown"
+                    current_detection["section"] = section if section else "Unknown"
+                    current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")  # Include AM/PM
 
-                    # Inserting data into database based on interval
+                    # Insert data into the database if the interval has passed
                     if name not in last_insertion_times:
-                        last_insertion_times[name] = now - insert_interval
+                        last_insertion_times[name] = now - insert_interval  # Set initial time
 
                     if now - last_insertion_times[name] >= insert_interval:
                         insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
-                        last_insertion_times[name] = now
+                        last_insertion_times[name] = now  # Update last insertion time
 
-                # Update detected_info or maintain last valid detection
                 detected_info.update(current_detection)
-                last_valid_detection = current_detection
+                last_valid_detection = current_detection  # Update last valid detection
 
             else:
-                # Handle the case where no faces are detected
-                detected_info.update(last_valid_detection)  # Maintain last valid detection
+                detected_info.update(last_valid_detection)
 
         else:
-            # If no blink is detected, skip further processing and mark as "No Blink Detected"
-            detected_info.update({"name": "No Blink Detected", "datetime": None, "grade_level": None, "section": None})
+            detected_info.update(last_valid_detection)
 
-        # Encode frame to JPEG format for streaming
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
 
 @faceRecognition_bp.route('/video_feed')
 def video_feed():
@@ -307,6 +347,7 @@ import numpy as np
 from keras_facenet import FaceNet
 from sklearn import svm
 import os
+import time
 
 # Create a Blueprint for face recognition
 faceRecognition_bp = Blueprint('faceRecognition', __name__)
@@ -373,7 +414,6 @@ def get_latest_entry_datetime(name):
         return None
     finally:
         conn.close()
-
 
 class VideoCamera:
     def __init__(self):
@@ -445,11 +485,22 @@ def get_all_users():
 # Initialize a dictionary to store the last insertion time for each user
 last_insertion_times = {}
 
+import time
+from datetime import datetime
+import cv2
+import numpy as np
+import os
+
+# Initialize a dictionary to store the last insertion time for each user
+last_insertion_times = {}
+
 def generate_frames():
     global detected_info
 
     # Initialize a variable to hold the last valid detected information
     last_valid_detection = detected_info.copy()
+    last_recognition_time = time.time()  # Initialize the last recognition time
+    recognition_cooldown = 2  # Set cooldown period in seconds
 
     while camera.running:
         frame = camera.get_frame()
@@ -466,10 +517,22 @@ def generate_frames():
             "name": "Unknown",
             "datetime": None,
             "grade_level": None,
-            "section": None
+            "section": None,
+            "confidence": 0.0  # To store the confidence score
         }
 
-        for res in faces:
+        # Process only if there are detected faces
+        if len(faces) > 0:
+            current_time = time.time()  # Get the current time
+            
+            # Process a new face only if enough time has passed since the last recognition
+            if current_time - last_recognition_time < recognition_cooldown:
+                # Skip processing if within cooldown
+                detected_info.update(last_valid_detection)  # Maintain previous valid detection
+                continue
+
+            # Focus on the first detected face
+            res = faces[0]
             face_embedding = res['embedding']
             face_embedding = np.array(face_embedding).reshape(1, -1)
 
@@ -477,12 +540,21 @@ def generate_frames():
             prediction = clf.predict(face_embedding)
             predicted_class_index = prediction[0]
 
+            # Get the probability predictions using SVM
+            probabilities = clf.predict_proba(face_embedding)
+
+            # Get the class with the highest probability
+            max_prob_index = np.argmax(probabilities)
+            max_prob = probabilities[0][max_prob_index]
+
             # Get the confidence score
             confidence_scores = clf.decision_function(face_embedding)
             confidence = confidence_scores[0][predicted_class_index] if len(confidence_scores.shape) > 1 else confidence_scores[0]
 
+            print(f"Max Probability: {max_prob}, Predicted Class Index: {max_prob_index}, Predicted Class: {label_encoder.inverse_transform([max_prob_index])[0]}")
+
             # Set confidence threshold
-            confidence_threshold = 0.5
+            confidence_threshold = 0.6
 
             if confidence < confidence_threshold:
                 name = "Unknown"
@@ -491,8 +563,12 @@ def generate_frames():
 
             # Draw bounding box and name
             x, y, w, h = res['box']
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+            box_color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)  # Green for known, Red for unknown
+            cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
+            cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+
+            # Show accuracy rate at the bottom of the box
+            cv2.putText(frame, f'Accuracy: {confidence:.2f}', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
             # Current date and time
             now = datetime.now()
@@ -503,6 +579,7 @@ def generate_frames():
 
             if retrieved_name:
                 current_detection["name"] = retrieved_name
+                current_detection["confidence"] = confidence
 
                 # Look for the user's corresponding folder
                 grade_level, section = None, None
@@ -532,6 +609,9 @@ def generate_frames():
                     insert_data(retrieved_name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
                     last_insertion_times[retrieved_name] = now  # Update last insertion time
 
+                # Update last recognition time after processing the face
+                last_recognition_time = current_time
+
         # Update detected_info with current detection or maintain last valid detection
         if current_detection["name"] != "Unknown":
             detected_info.update(current_detection)
@@ -553,9 +633,10 @@ def generate_frames():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@faceRecognition_bp.route('/get_detected_info')
+@faceRecognition_bp.route('/get_detected_info', methods=['GET'])
 def get_detected_info():
     return jsonify(detected_info)
+
 '''
 '''
 from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for
