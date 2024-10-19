@@ -11,6 +11,7 @@ import os
 import dlib
 import time
 import logging
+from collections import deque
 
 # Initialize logging
 logging.basicConfig(filename='face_recognition.log', level=logging.INFO)
@@ -195,9 +196,6 @@ def is_blinking(frame):
             return True  # Blink detected
 
     return False  # No blink detected
-
-# Add this import for the moving average smoothing
-from collections import deque
 
 # Initialize parameters for smoothing the bounding box
 bounding_box_history = deque(maxlen=5)  # Store the last 5 bounding box positions
