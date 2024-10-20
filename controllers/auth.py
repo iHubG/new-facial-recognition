@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 import sqlite3
 import bcrypt
 from pathlib import Path
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -11,6 +12,18 @@ def get_db_connection():
 
 def verify_password(stored_hash, password):
     return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+
+def insert_activity_log(name, activity, date_time):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO activitylogs (name, activity, date_time)
+        VALUES (?, ?, ?)
+    ''', (name, activity, date_time))
+
+    conn.commit()
+    conn.close()
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -41,6 +54,11 @@ def login():
                     if verify_password(stored_hash, password):
                         session['logged_in'] = True
                         session['username'] = username
+                        
+                        date_time = datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
+
+                        insert_activity_log(username, 'Logged in', date_time)
+                        
                         success_message = 'Login successful! Redirecting...' 
                     else:
                         errors['auth'] = 'Username and Password do not match!'
