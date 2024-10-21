@@ -388,7 +388,7 @@
       updateDateTime();
 
       function fetchAllUsers() {
-          fetch('/user/get_all_users')
+          fetch('/admin/get_all_users')
               .then(response => response.json())
               .then(data => {
                   const userTable = document.getElementById('attendanceTable');

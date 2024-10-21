@@ -30,10 +30,10 @@
                     <p class="text-base text-green-500">Present</p>
                 </div>
                 <div class="flex-col w-3/5 p-5 px-0">
-                    <h5 class="text-lg font-semibold" id="detected-name">Macalinao, Ian P.</h5>
-                    <p class="text-base" id="detected-grade-section">Grade 9 Santan</p>
+                    <h5 class="text-lg font-semibold" id="detected-name">Unknown</h5>
+                    <p class="text-base" id="detected-grade-section">N/A - N/A</p>
                     <p class="text-base">Pinoma National High School</p>
-                    <p class="text-base mt-5" id="detected-time">09/28/2024 7:00 AM</p>
+                    <p class="text-base mt-5" id="detected-time">N/A</p>
                 </div>
             </div>
         </section>
@@ -135,50 +135,86 @@
     </main> 
     
     <script>
-        // Function to fetch detected info periodically
+        let isFetchingDetectedInfo = false;
+        let isFetchingUserData = false;
+        
         function fetchDetectedInfo() {
+            if (isFetchingDetectedInfo) return; // Prevent overlap
+            isFetchingDetectedInfo = true;
+        
             fetch('/user/get_detected_info')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('detected-name').innerText = data.name || "Unknown";
-                document.getElementById('detected-time').innerText = data.datetime || "N/A";
-                
-                // Retrieve grade and section directly from the data object
-                const grade = data.grade_level || "N/A"; // Assuming grade_level is a field in data
-                const section = data.section || "N/A"; // Assuming section is a field in data
-                
-                // Set the concatenated grade and section
-                document.getElementById('detected-grade-section').innerText = `${grade} - ${section}`;
-                
-            })
-            .catch(error => console.error('Error fetching detected info:', error));
-        }
-
-        // Fetch detected info every second
-        setInterval(fetchDetectedInfo, 1000);
-
-        function fetchAllUsers() {
-            fetch('/user/get_all_users')
                 .then(response => response.json())
                 .then(data => {
+                    document.getElementById('detected-name').innerText = data.name || "Unknown";
+                    document.getElementById('detected-time').innerText = data.datetime || "N/A";
+                    const grade = data.grade_level || "N/A";
+                    const section = data.section || "N/A";
+                    document.getElementById('detected-grade-section').innerText = `${grade} - ${section}`;
+                })
+                .catch(error => console.error('Error fetching detected info:', error))
+                .finally(() => isFetchingDetectedInfo = false); // Reset flag
+        }
+        
+        // Fetch detected info every second
+        setInterval(fetchDetectedInfo, 1000);
+        
+        function fetchUserData() {
+            if (isFetchingUserData) return; // Prevent overlap
+            isFetchingUserData = true;
+        
+            fetch('/user/current_user')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(userInfo => {
+                    const name = userInfo.name; // Get the current user's name
+                    fetchAllUsersData(name); // Fetch user-specific data
+                })
+                .catch(error => console.error('Error fetching user data:', error))
+                .finally(() => isFetchingUserData = false); // Reset flag
+        }
+        
+        function fetchAllUsersData(name) {
+            if (!name) {
+                console.error("Name is required to fetch user data.");
+                return;
+            }
+        
+            let url = `/user/get_all_users_data/${encodeURIComponent(name)}`;
+        
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
                     const userTable = document.getElementById('userTable');
-
+        
                     // Clear existing rows (except for header)
                     userTable.innerHTML = `
                         <tr class="bg-gray-100">
-                            <th class="text-gray-600 border border-gray-300 p-1">ID</th>
+                            <th class="text-gray-600 border border-gray-300 p-1">#</th>
                             <th class="text-gray-600 border border-gray-300 p-1">Name</th>
+                            <th class="text-gray-600 border border-gray-300 p-1">Grade</th>
+                            <th class="text-gray-600 border border-gray-300 p-1">Section</th>
                             <th class="text-gray-600 border border-gray-300 p-1">Entry Datetime</th>
                             <th class="text-gray-600 border border-gray-300 p-1">Period</th>
                         </tr>
                     `;
-
+        
                     // Populate table with fetched data
-                    data.forEach(user => {
+                    data.forEach((user, index) => {
                         userTable.innerHTML += `
-                            <tr">
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.id}</td>
+                            <tr>
+                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${index + 1}</td>
                                 <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.name}</td>
+                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.grade_level}</td>
+                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.section}</td>
                                 <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.entry_datetime}</td>
                                 <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.period}</td>
                             </tr>
@@ -187,10 +223,15 @@
                 })
                 .catch(error => console.error('Error fetching user data:', error));
         }
-
-        // Call the function when the page loads
-        document.addEventListener('DOMContentLoaded', fetchAllUsers);
-
+        
+        // Call this function when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchUserData(); // Initial fetch
+            setTimeout(() => {
+                location.reload(); // Reload the page after a short delay
+            }, 3000); // Adjust the delay as needed (e.g., 1000 ms = 1 second)
+        });
+             
     </script>
 </body>
 </html>
