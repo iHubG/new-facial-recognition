@@ -56,6 +56,9 @@ def insert_data(name, entry_datetime, period, grade_level, section):
         print(f"Error inserting data: {e}")
     finally:
         conn.close()
+        
+def async_insert_data(name, entry_datetime, period, grade_level, section):
+    threading.Thread(target=insert_data, args=(name, entry_datetime, period, grade_level, section)).start()
 
 def get_user_data(name):
     try:
@@ -153,13 +156,25 @@ def get_user_data(name):
         SELECT name, entry_datetime, period, section, grade_level 
         FROM users 
         WHERE name = ? 
-        ORDER BY id DESC  -- Order by ID to get the latest entries
+        ORDER BY id DESC  
         LIMIT 5
     '''
     users = conn.execute(query, (name,)).fetchall()
     conn.close()
     
     return jsonify([dict(user) for user in users]) # Return user data as a list of dictionaries
+
+def async_fetch_user_data(name):
+    try:
+        response = requests.get(f'http://127.0.0.1:5000/user/get_all_users_data/{name}')
+        if response.ok:
+            user_data = response.json()
+            # Process user_data here if needed
+        else:
+            print("Failed to fetch user data")
+    except Exception as e:
+        print(f"Error fetching user data: {e}")
+
 
 # Initialize a dictionary to store the last insertion time for each user
 last_insertion_times = {}
@@ -319,20 +334,15 @@ def generate_frames():
                         last_insertion_times[name] = now - insert_interval  # Set initial time
 
                     if now - last_insertion_times[name] >= insert_interval:
-                        insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        #insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        async_insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
                         last_insertion_times[name] = now  # Update last insertion time
 
                 detected_info.update(current_detection)
                 last_valid_detection = current_detection # Update last valid detection
                 # Fetch current user name
-               
-                # Now fetch the user data based on the name
-                response = requests.get(f'http://127.0.0.1:5000/user/get_all_users_data/{name}')
-                if response.ok:
-                    user_data = response.json()
-                    return user_data
-                else:
-                    print("Failed to fetch user data")
+            
+                threading.Thread(target=async_fetch_user_data, args=(name,)).start()
 
             else:
                 detected_info.update(last_valid_detection)
@@ -344,7 +354,7 @@ def generate_frames():
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        
+
 @faceRecognition_bp.route('/current_user', methods=['GET'])
 def current_user(): 
     return jsonify({'name': current_user_name})
@@ -356,6 +366,8 @@ def video_feed():
 @faceRecognition_bp.route('/get_detected_info')
 def get_detected_info():
     return jsonify(detected_info)
+    
+
 '''
 from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for
 import cv2
@@ -367,7 +379,18 @@ import numpy as np
 from keras_facenet import FaceNet
 from sklearn import svm
 import os
+import dlib
 import time
+import logging
+from collections import deque
+import requests
+
+# Initialize logging
+logging.basicConfig(filename='face_recognition.log', level=logging.INFO)
+
+# Example of logging predictions
+def log_prediction(image_path, expected, predicted):
+    logging.info(f"Image: {image_path}, Expected: {expected}, Predicted: {predicted}")
 
 # Create a Blueprint for face recognition
 faceRecognition_bp = Blueprint('faceRecognition', __name__)
@@ -404,6 +427,9 @@ def insert_data(name, entry_datetime, period, grade_level, section):
         print(f"Error inserting data: {e}")
     finally:
         conn.close()
+        
+def async_insert_data(name, entry_datetime, period, grade_level, section):
+    threading.Thread(target=insert_data, args=(name, entry_datetime, period, grade_level, section)).start()
 
 def get_user_data(name):
     try:
@@ -434,6 +460,7 @@ def get_latest_entry_datetime(name):
         return None
     finally:
         conn.close()
+
 
 class VideoCamera:
     def __init__(self):
@@ -493,31 +520,98 @@ def toggle_camera():
     camera_running = not camera_running
     return redirect(url_for('faceRecognition.dashboard'))
 
-@faceRecognition_bp.route('/get_all_users', methods=['GET'])
-def get_all_users():
+@faceRecognition_bp.route('/get_all_users_data/<string:name>', methods=['GET'])
+def get_user_data(name):
     conn = get_db_connection()
-    users = conn.execute('SELECT * FROM users').fetchall()
+    query = '
+        SELECT name, entry_datetime, period, section, grade_level 
+        FROM users 
+        WHERE name = ? 
+        ORDER BY id DESC  
+        LIMIT 5
+    '
+    users = conn.execute(query, (name,)).fetchall()
     conn.close()
     
-    users_list = [dict(user) for user in users]
-    return jsonify(users_list)
+    return jsonify([dict(user) for user in users]) # Return user data as a list of dictionaries
+
+def async_fetch_user_data(name):
+    try:
+        response = requests.get(f'http://127.0.0.1:5000/user/get_all_users_data/{name}')
+        if response.ok:
+            user_data = response.json()
+            # Process user_data here if needed
+        else:
+            print("Failed to fetch user data")
+    except Exception as e:
+        print(f"Error fetching user data: {e}")
+
 
 # Initialize a dictionary to store the last insertion time for each user
 last_insertion_times = {}
 
-import time
-from datetime import datetime
-import cv2
-import numpy as np
-import os
+# Initialize dlib's face detector and shape predictor
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
-# Initialize a dictionary to store the last insertion time for each user
-last_insertion_times = {}
+# Eye landmark points for detecting blinks
+LEFT_EYE_POINTS = list(range(36, 42))
+RIGHT_EYE_POINTS = list(range(42, 48))
+
+# Helper function to calculate the eye aspect ratio (EAR)
+def eye_aspect_ratio(eye):
+    A = np.linalg.norm(eye[1] - eye[5])
+    B = np.linalg.norm(eye[2] - eye[4])
+    C = np.linalg.norm(eye[0] - eye[3])
+    ear = (A + B) / (2.0 * C)
+    return ear
+
+def is_blinking(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = detector(gray)
+
+    if len(faces) == 0:
+        return False  # No face detected
+
+    for face in faces:
+        landmarks = predictor(gray, face)
+
+        left_eye = np.array([(landmarks.part(point).x, landmarks.part(point).y) for point in LEFT_EYE_POINTS])
+        right_eye = np.array([(landmarks.part(point).x, landmarks.part(point).y) for point in RIGHT_EYE_POINTS])
+
+        left_ear = eye_aspect_ratio(left_eye)
+        right_ear = eye_aspect_ratio(right_eye)
+
+        # Set threshold for blinking based on EAR
+        blink_threshold = 0.20
+
+        if left_ear < blink_threshold and right_ear < blink_threshold:
+            return True  # Blink detected
+
+    return False  # No blink detected
+
+# Initialize parameters for smoothing the bounding box
+bounding_box_history = deque(maxlen=5)  # Store the last 5 bounding box positions
+
+def smooth_bounding_box(current_box):
+    """Smooth the bounding box position."""
+    bounding_box_history.append(current_box)  # Add current box to history
+    if len(bounding_box_history) > 0:
+        # Calculate the average box coordinates
+        avg_x = int(np.mean([box[0] for box in bounding_box_history]))
+        avg_y = int(np.mean([box[1] for box in bounding_box_history]))
+        avg_w = int(np.mean([box[2] for box in bounding_box_history]))
+        avg_h = int(np.mean([box[3] for box in bounding_box_history]))
+        return (avg_x, avg_y, avg_w, avg_h)
+    return current_box
+
+# Dictionary to store recognized users for the session
+recognized_users = {}
+
+current_user_name = "Unknown"
 
 def generate_frames():
-    global detected_info
-
-    # Initialize a variable to hold the last valid detected information
+    global detected_info, current_user_name
     last_valid_detection = detected_info.copy()
     last_recognition_time = time.time()  # Initialize the last recognition time
     recognition_cooldown = 2  # Set cooldown period in seconds
@@ -529,133 +623,120 @@ def generate_frames():
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Extract face embeddings
-        faces = embedder.extract(rgb_frame, threshold=0.95)
+        # Check if a blink is detected to validate live face
+        if is_blinking(frame):
+            faces = embedder.extract(rgb_frame, threshold=0.95)
 
-        # Default detected info
-        current_detection = {
-            "name": "Unknown",
-            "datetime": None,
-            "grade_level": None,
-            "section": None,
-            "confidence": 0.0  # To store the confidence score
-        }
+            current_detection = {
+                "name": "Unknown",
+                "datetime": None,
+                "grade_level": None,
+                "section": None,
+                "confidence": 0.0  # To store the confidence score
+            }
 
-        # Process only if there are detected faces
-        if len(faces) > 0:
-            current_time = time.time()  # Get the current time
-            
-            # Process a new face only if enough time has passed since the last recognition
-            if current_time - last_recognition_time < recognition_cooldown:
-                # Skip processing if within cooldown
-                detected_info.update(last_valid_detection)  # Maintain previous valid detection
-                continue
+            if len(faces) > 0:
+                current_time = time.time()  # Get the current time
 
-            # Focus on the first detected face
-            res = faces[0]
-            face_embedding = res['embedding']
-            face_embedding = np.array(face_embedding).reshape(1, -1)
+                # Process the first detected face
+                res = faces[0]
+                face_embedding = np.array(res['embedding']).reshape(1, -1)
 
-            # Predict using SVM
-            prediction = clf.predict(face_embedding)
-            predicted_class_index = prediction[0]
+                # Predict using SVM and get the probability predictions
+                probabilities = clf.predict_proba(face_embedding)
+                max_prob_index = np.argmax(probabilities)
+                max_prob = probabilities[0][max_prob_index]
 
-            # Get the probability predictions using SVM
-            probabilities = clf.predict_proba(face_embedding)
+                # Set confidence threshold for unknown faces (e.g., 0.5)
+                confidence_threshold = 0.5
 
-            # Get the class with the highest probability
-            max_prob_index = np.argmax(probabilities)
-            max_prob = probabilities[0][max_prob_index]
+                name = label_encoder.inverse_transform([max_prob_index])[0] if max_prob >= confidence_threshold else "Unknown"
 
-            # Get the confidence score
-            confidence_scores = clf.decision_function(face_embedding)
-            confidence = confidence_scores[0][predicted_class_index] if len(confidence_scores.shape) > 1 else confidence_scores[0]
+                # Prevent showing "Unknown" after a successful recognition
+                if name != "Unknown":
+                    recognized_users[tuple(res['box'])] = name  # Track the recognized user
+                    last_recognition_time = current_time  # Update recognition time
+                else:
+                    # Check if this face was recognized before (within the session)
+                    if tuple(res['box']) in recognized_users:
+                        name = recognized_users[tuple(res['box'])]  # Use previously recognized name
 
-            print(f"Max Probability: {max_prob}, Predicted Class Index: {max_prob_index}, Predicted Class: {label_encoder.inverse_transform([max_prob_index])[0]}")
+                # Smooth the bounding box coordinates
+                x, y, w, h = res['box']
+                smoothed_box = smooth_bounding_box((x, y, w, h))
+                x, y, w, h = smoothed_box
 
-            # Set confidence threshold
-            confidence_threshold = 0.6
+                box_color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)  # Green for known, Red for unknown
+                cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
+                cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
-            if confidence < confidence_threshold:
-                name = "Unknown"
-            else:
-                name = label_encoder.inverse_transform([predicted_class_index])[0]
+                # Show accuracy rate at the bottom of the box formatted as a percentage
+                accuracy_percentage = max_prob * 100  # Convert to percentage
+                cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
-            # Draw bounding box and name
-            x, y, w, h = res['box']
-            box_color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)  # Green for known, Red for unknown
-            cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
-            cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+                # Current date and time
+                now = datetime.now()
+                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")  # 12-hour format with AM/PM
 
-            # Show accuracy rate at the bottom of the box
-            cv2.putText(frame, f'Accuracy: {confidence:.2f}', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+                if name != "Unknown":
+                    current_detection["name"] = name
+                    current_detection["confidence"] = max_prob
+                    current_user_name = name
 
-            # Current date and time
-            now = datetime.now()
-            entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")  # 12-hour format with AM/PM
-
-            # Check if the user is recognized
-            retrieved_name = name if name != "Unknown" else None
-
-            if retrieved_name:
-                current_detection["name"] = retrieved_name
-                current_detection["confidence"] = confidence
-
-                # Look for the user's corresponding folder
-                grade_level, section = None, None
-
-                for root, dirs, files in os.walk('datasets'):
-                    for dir in dirs:
-                        section_path = os.path.join(root, dir)
-                        for student_file in os.listdir(section_path):
-                            if retrieved_name in student_file:
-                                grade_level = os.path.basename(os.path.dirname(section_path))
-                                section = dir
+                    # Look for the user's corresponding folder
+                    grade_level, section = None, None
+                    for root, dirs, files in os.walk('datasets'):
+                        for dir in dirs:
+                            section_path = os.path.join(root, dir)
+                            for student_file in os.listdir(section_path):
+                                if name in student_file:
+                                    grade_level = os.path.basename(os.path.dirname(section_path))
+                                    section = dir
+                                    break
+                            if grade_level and section:
                                 break
-                        if grade_level and section:
-                            break
 
-                current_detection["grade_level"] = grade_level if grade_level else "Unknown"
-                current_detection["section"] = section if section else "Unknown"
+                    current_detection["grade_level"] = grade_level if grade_level else "Unknown"
+                    current_detection["section"] = section if section else "Unknown"
+                    current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")  # Include AM/PM
+                    
+                    # Insert data into the database if the interval has passed
+                    if name not in last_insertion_times:
+                        last_insertion_times[name] = now - insert_interval  # Set initial time
 
-                # Update datetime immediately after recognition
-                current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")  # Include AM/PM
+                    if now - last_insertion_times[name] >= insert_interval:
+                        #insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        async_insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        last_insertion_times[name] = now  # Update last insertion time
 
-                # Insert data into the database if the interval has passed
-                if retrieved_name not in last_insertion_times:
-                    last_insertion_times[retrieved_name] = now - insert_interval  # Set initial time
+                detected_info.update(current_detection)
+                last_valid_detection = current_detection # Update last valid detection
+                # Fetch current user name
+            
+                threading.Thread(target=async_fetch_user_data, args=(name,)).start()
 
-                if now - last_insertion_times[retrieved_name] >= insert_interval:
-                    insert_data(retrieved_name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
-                    last_insertion_times[retrieved_name] = now  # Update last insertion time
+            else:
+                detected_info.update(last_valid_detection)
 
-                # Update last recognition time after processing the face
-                last_recognition_time = current_time
-
-        # Update detected_info with current detection or maintain last valid detection
-        if current_detection["name"] != "Unknown":
-            detected_info.update(current_detection)
-            last_valid_detection = current_detection  # Update last valid detection
         else:
-            # Maintain previous valid detection information
             detected_info.update(last_valid_detection)
 
-        # Print detected information for debugging
-        print(f"Detected: {detected_info['name']}, Time: {detected_info['datetime']}, Grade: {detected_info['grade_level']}, Section: {detected_info['section']}")
-
-        # Encode and yield the frame
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        
+@faceRecognition_bp.route('/current_user', methods=['GET'])
+def current_user(): 
+    return jsonify({'name': current_user_name})
 
 @faceRecognition_bp.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@faceRecognition_bp.route('/get_detected_info', methods=['GET'])
+@faceRecognition_bp.route('/get_detected_info')
 def get_detected_info():
     return jsonify(detected_info)
-
+    
 '''
 

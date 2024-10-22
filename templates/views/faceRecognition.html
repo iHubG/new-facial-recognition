@@ -51,7 +51,7 @@
                         <p>20%</p>
                     </div>
                 </div>
-                <div class="p-4 mt-5">
+                <div class="p-4 mt-5 hidden">
                     <h2>Monthly Data</h2>
                     <canvas id="barChart"></canvas>
                     <script>
@@ -135,14 +135,13 @@
     </main> 
     
     <script>
-        let isFetchingDetectedInfo = false;
-        let isFetchingUserData = false;
+        let isFetching = false;
+
+        function fetchData() {
+            if (isFetching) return; // Prevent overlap
+            isFetching = true;
         
-        function fetchDetectedInfo() {
-            if (isFetchingDetectedInfo) return; // Prevent overlap
-            isFetchingDetectedInfo = true;
-        
-            fetch('/user/get_detected_info')
+            const detectedInfoPromise = fetch('/user/get_detected_info')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('detected-name').innerText = data.name || "Unknown";
@@ -151,18 +150,9 @@
                     const section = data.section || "N/A";
                     document.getElementById('detected-grade-section').innerText = `${grade} - ${section}`;
                 })
-                .catch(error => console.error('Error fetching detected info:', error))
-                .finally(() => isFetchingDetectedInfo = false); // Reset flag
-        }
+                .catch(error => console.error('Error fetching detected info:', error));
         
-        // Fetch detected info every second
-        setInterval(fetchDetectedInfo, 1000);
-        
-        function fetchUserData() {
-            if (isFetchingUserData) return; // Prevent overlap
-            isFetchingUserData = true;
-        
-            fetch('/user/current_user')
+            const userDataPromise = fetch('/user/current_user')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok: ' + response.statusText);
@@ -171,21 +161,33 @@
                 })
                 .then(userInfo => {
                     const name = userInfo.name; // Get the current user's name
-                    fetchAllUsersData(name); // Fetch user-specific data
+                    return fetchAllUsersData(name); // Fetch user-specific data
                 })
-                .catch(error => console.error('Error fetching user data:', error))
-                .finally(() => isFetchingUserData = false); // Reset flag
+                .catch(error => console.error('Error fetching user data:', error));
+        
+            Promise.all([detectedInfoPromise, userDataPromise])
+                .then(() => {
+                    // Reset fetching status after both promises resolve
+                    isFetching = false;
+                })
+                .catch(() => {
+                    // Handle errors if any of the fetches fail
+                    isFetching = false;
+                });
         }
+        
+        // Fetch data every second
+        setInterval(fetchData, 1000);
         
         function fetchAllUsersData(name) {
             if (!name) {
                 console.error("Name is required to fetch user data.");
-                return;
+                return Promise.resolve(); // Return a resolved promise if name is not provided
             }
         
             let url = `/user/get_all_users_data/${encodeURIComponent(name)}`;
         
-            fetch(url)
+            return fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok: ' + response.statusText);
@@ -226,12 +228,9 @@
         
         // Call this function when the page loads
         document.addEventListener('DOMContentLoaded', () => {
-            fetchUserData(); // Initial fetch
-            setTimeout(() => {
-                location.reload(); // Reload the page after a short delay
-            }, 3000); // Adjust the delay as needed (e.g., 1000 ms = 1 second)
+            fetchData(); // Initial fetch
         });
-             
+        
     </script>
 </body>
 </html>
