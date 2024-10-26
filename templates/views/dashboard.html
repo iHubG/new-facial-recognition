@@ -78,7 +78,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Students</div>
-                          <div class="stat-value">500</div>
+                          <div class="stat-value" id="unique-student-count">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -311,23 +311,23 @@
               </div>     
           </div>
           <div id="backup" class="page hidden">
-              <div class="rounded p-4">
-                  <h2 class="text-xl font-semibold">Database Backup</h2>
-                    <div class="flex items-center justify-center mt-5">
-                      <button class="py-2 px-5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-300 hover:text-gray-700" onclick="backupDatabase.showModal()">Backup Database</button>
-                        <dialog id="backupDatabase" class="modal">
-                          <div class="modal-box">
-                            <p class="py-4 text-center">Do you want to backup your database?</p>
-                            <div class="modal-action flex items-center justify-center">
-                              <form method="dialog" class="flex justify-between gap-5">
-                                <button type="button" class="py-2 px-5 text-green-700 bg-white border border-green-500 rounded-lg hover:bg-green-500 hover:text-white" onclick="backupDatabase.close()">Yes</button>
-                                <button type="button" class="py-2 px-5 text-rose-700 bg-white border border-rose-500 rounded-lg hover:bg-rose-500 hover:text-white" onclick="backupDatabase.close()">No</button>
-                              </form>
-                            </div>
-                          </div>
-                        </dialog>
-                    </div>
-              </div>     
+            <div class="rounded p-4">
+              <h2 class="text-xl font-semibold">Database Backup</h2>
+                <div class="flex items-center justify-center mt-5">
+                  <button class="py-2 px-5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-300 hover:text-gray-700" onclick="backupDatabase.showModal()">Backup Database</button>
+                    <dialog id="backupDatabase" class="modal">
+                      <div class="modal-box">
+                        <p class="py-4 text-center">Do you want to backup your database?</p>
+                        <div class="modal-action flex items-center justify-center">
+                          <form method="POST" class="flex justify-between gap-5">
+                            <button type="button" class="py-2 px-5 text-green-700 bg-white border border-green-500 rounded-lg hover:bg-green-500 hover:text-white" onclick="confirmBackup()">Yes</button>
+                            <button type="button" class="py-2 px-5 text-rose-700 bg-white border border-rose-500 rounded-lg hover:bg-rose-500 hover:text-white" onclick="backupDatabase.close()">No</button>
+                          </form>
+                        </div>
+                      </div>
+                    </dialog>
+                </div>
+            </div>     
           </div>
       </div>
   </div>
@@ -471,7 +471,31 @@
     }
     
     // Call the function when the page loads
-    document.addEventListener('DOMContentLoaded', fetchAllLogs);    
+    document.addEventListener('DOMContentLoaded', fetchAllLogs);   
+    
+    function confirmBackup() {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/admin/backup';
+      document.body.appendChild(form);
+      form.submit(); // Trigger the download
+      backupDatabase.close(); // Close the modal
+    }
+
+    // Function to fetch the count of unique students
+    async function fetchUniqueStudentCount() {
+      try {
+        const response = await fetch('/admin/count_all_users'); // Updated URL to match the new endpoint
+        const data = await response.json();
+        document.getElementById('unique-student-count').textContent = data.unique_users_count;
+      } catch (error) {
+        console.error('Error fetching student count:', error);
+        document.getElementById('unique-student-count').textContent = 'Error';
+      }
+    }
+
+    // Call the function to fetch the count when the page loads
+    window.onload = fetchUniqueStudentCount;
     
   </script>
 </body>

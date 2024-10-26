@@ -7,8 +7,9 @@ from datetime import datetime
 auth_bp = Blueprint('auth', __name__)
 
 def get_db_connection():
-    db_path =  db_path = Path(__file__).resolve().parent.parent / 'model' / 'face.db'
-    return sqlite3.connect(db_path, timeout=10)  
+    conn = sqlite3.connect('face-recognition.db')
+    conn.row_factory = sqlite3.Row
+    return conn 
 
 def verify_password(stored_hash, password):
     return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
@@ -45,7 +46,7 @@ def login():
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute('SELECT password_hash FROM users WHERE username = ?', (username,))
+                cursor.execute('SELECT password_hash FROM admin WHERE username = ?', (username,))
                 result = cursor.fetchone()
                 conn.close()
 

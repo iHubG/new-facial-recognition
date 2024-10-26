@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, session, jsonify
+from flask import Blueprint, render_template, redirect, url_for, session, jsonify, send_file
 import sqlite3
 from pathlib import Path
 from datetime import datetime
+import os
+import shutil
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -11,12 +13,13 @@ def dashboard():
         return redirect(url_for('auth.login'))
     return render_template('views/dashboard.html')
 
-def get_db_connectionFaceDb():
-    db_path =  db_path = Path(__file__).resolve().parent.parent / 'model' / 'face.db'
-    return sqlite3.connect(db_path, timeout=10) 
+def get_db_connection():
+    conn = sqlite3.connect('face-recognition.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def insert_activity_log(name, activity, date_time):
-    conn = get_db_connectionFaceDb()
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -38,11 +41,6 @@ def logout():
     session.pop('username', None) 
     return redirect(url_for('auth.login'))
 
-def get_db_connection():
-    conn = sqlite3.connect('face-recognition.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
 @dashboard_bp.route('/get_all_users', methods=['GET'])
 def get_all_users():
     conn = get_db_connection()
@@ -52,10 +50,19 @@ def get_all_users():
     users_list = [dict(user) for user in users]
     return jsonify(users_list)
 
+@dashboard_bp.route('/count_all_users', methods=['GET'])
+def count_all_users():
+    conn = get_db_connection()
+    # Count distinct names directly in the query
+    count = conn.execute('SELECT COUNT(DISTINCT name) FROM users').fetchone()[0]
+    conn.close()
+    
+    return jsonify({'unique_users_count': count})
+
 @dashboard_bp.route('/get_activity_logs', methods=['GET'])
 def get_activity_logs():
     try:
-        conn = get_db_connectionFaceDb()
+        conn = get_db_connection()
         logs = conn.execute('SELECT * FROM activitylogs').fetchall()
 
         columns = [column[0] for column in conn.execute('SELECT * FROM activitylogs').description]
@@ -68,3 +75,19 @@ def get_activity_logs():
     except Exception as e:
         print(f"Error fetching activity logs: {e}")
         return jsonify({"error": str(e)}), 500
+    
+@dashboard_bp.route('/backup', methods=['POST'])
+def backup_database():
+    db_path = 'face-recognition.db'  # Path to the database file in the root directory
+    backup_path = 'backup/face_recognition_backup.db'  # Backup path
+
+    # Ensure the backup directory exists
+    os.makedirs('backup', exist_ok=True)
+
+    # Copy the database file to create a backup
+    shutil.copyfile(db_path, backup_path)
+
+    # Return the backup file for download
+    return send_file(backup_path, as_attachment=True)
+   
+
