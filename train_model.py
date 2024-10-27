@@ -39,17 +39,19 @@ for root, dirs, files in os.walk('datasets'):
                 image = cv2.imread(image_path)
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-                # Apply augmentations
-                augmented = transform(image=image)
-                img_aug = augmented['image']
+                # Generate multiple augmentations
+                for _ in range(19):  # Adjust the number of augmentations
+                    augmented = transform(image=image)
+                    img_aug = augmented['image']
 
-                # Extract face embeddings
-                faces = embedder.extract(img_aug, threshold=0.95)
+                    # Extract face embeddings
+                    faces = embedder.extract(img_aug, threshold=0.95)
 
-                if len(faces) > 0:
-                    face_embedding = faces[0]['embedding']  # Take the first face detected
-                    X.append(face_embedding)
-                    y.append(label)
+                    if len(faces) > 0:
+                        face_embedding = faces[0]['embedding']  # Take the first face detected
+                        X.append(face_embedding)
+                        y.append(label)
+
             except Exception as e:
                 print(f"Error processing {image_path}: {e}")
                 logging.error(f"Error processing {image_path}: {e}")
@@ -85,9 +87,6 @@ if accuracy > 0.8:  # Example threshold
 else:
     print("Model accuracy is too low. Not saving the model.")
     logging.warning("Model accuracy is too low. Not saving the model.")
-
-print(f"Validation Accuracy: {accuracy * 100:.2f}%")
-logging.info(f"Validation Accuracy: {accuracy * 100:.2f}%")
 
 # Evaluate the model on the validation set
 y_pred = clf.predict(X_val)
@@ -220,9 +219,6 @@ else:
     print("Model accuracy is too low. Not saving the model.")
     logging.warning("Model accuracy is too low. Not saving the model.")
 
-print(f"Validation Accuracy: {accuracy * 100:.2f}%")
-logging.info(f"Validation Accuracy: {accuracy * 100:.2f}%")
-
 # Evaluate the model on the validation set
 y_pred = clf.predict(X_val)
 accuracy = accuracy_score(y_val, y_pred)
@@ -265,7 +261,6 @@ y_unknown = (y_proba.max(axis=1) < best_threshold)  # Identify low-confidence fa
 print(f"Number of 'Unknown' faces detected in validation set: {y_unknown.sum()}")
 logging.info(f"Number of 'Unknown' faces detected in validation set: {y_unknown.sum()}")
 '''
-
 
 
 
