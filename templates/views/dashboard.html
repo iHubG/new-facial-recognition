@@ -6,6 +6,8 @@
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
     <script src="{{ url_for('static', filename='dist/chart.umd.js') }}"></script>
+    <script src="{{ url_for('static', filename='excel/xlsx.full.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
 </head>
 <body class="flex h-screen bg-sky-100 font-sans">
   <div class="w-64 bg-gray-800 text-white fixed top-0 bottom-0 p-4 flex flex-col">
@@ -67,7 +69,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Total Users</div>
-                          <div class="stat-value">1200</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -89,7 +91,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Teachers</div>
-                          <div class="stat-value">50</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -100,7 +102,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Staffs</div>
-                          <div class="stat-value">25</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -111,7 +113,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Total Attendance</div>
-                          <div class="stat-value">10002</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -122,7 +124,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Total Absences</div>
-                          <div class="stat-value">500</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -133,7 +135,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Daily Attendance</div>
-                          <div class="stat-value">500</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -144,7 +146,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Daily Absences</div>
-                          <div class="stat-value">40</div>
+                          <div class="stat-value">Loading...</div>
                       </div>
                       
                   </div>
@@ -203,112 +205,84 @@
             <div class="rounded p-4">
               <h2 class="text-xl font-semibold">Attendance Records</h2>
               <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
-                <div class="flex p-4 justify-between">
-                  <input type="text" placeholder="Search" class="input input-bordered w-full max-w-xs" />
-                  <div class="flex gap-2">
-                    <select title="sort-grade" class="select select-bordered w-full max-w-48">
-                      <option disabled selected>Grade Level</option>
-                      <option>Grade 7</option>
-                      <option>Grade 8</option>
-                      <option>Grade 9</option>
-                      <option>Grade 10</option>
-                      <option>Grade 11</option>
-                      <option>Grade 12</option>
-                    </select>
-                    <select title="sort-grade" class="select select-bordered w-full max-w-48">
-                      <option disabled selected>Section</option>
-                      <option>Section 1</option>
-                      <option>Section 2</option>
-                      <option>Section 3</option>     
-                    </select>
-                    <select title="sort-date" class="select select-bordered w-full max-w-48">
-                      <option disabled selected>Sort By</option>
-                      <option>Date Modified</option>
-                      <option>Name</option>
-                    </select>
-                  </div>  
-                </div>
-                <table class="table" id="attendanceTable">
-                 
-                  <thead>
-                     <!--
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Status</th>
-                      <th>Grade</th>
-                      <th>Section</th>
-                      <th>Date & Time</th>
-                    </tr>
-                     -->
-                  </thead>
-                 
-                  <tbody>
-                    <!--
-                    <tr>
-                      <th>2</th>
-                      <td>Cy Ganderton</td>
-                      <td>Present</td>
-                      <td>Grade 11</td>
-                      <td>ICT-A</td>
-                      <td>09/17/2024 7:20 AM</td>
-                    </tr>
-                    <tr>
-                      <th>1</th>
-                      <td>Cy Ganderton</td>
-                      <td>Present</td>
-                      <td>Grade 11</td>
-                      <td>ICT-A</td>
-                      <td>09/17/2024 7:00 AM</td>
-                    </tr>
-                    -->
-                  </tbody>
-                </table>
+                  <div class="flex p-4 justify-between">
+                      <input type="text" id="searchInputUsers" placeholder="Search" class="input input-bordered w-full max-w-xs" oninput="filterUsers()" />
+                      <div class="flex gap-2">
+                          <select id="gradeSelect" title="sort-grade" class="select select-bordered w-full max-w-48" onchange="updateSections()">
+                              <option selected>Grade Level</option>
+                              <option value="grade_7">Grade 7</option>
+                              <option value="grade_8">Grade 8</option>
+                              <option value="grade_9">Grade 9</option>
+                              <option value="grade_10">Grade 10</option>
+                              <option value="grade_11">Grade 11</option>
+                              <option value="grade_12">Grade 12</option>
+                          </select>
+                          <select id="sectionSelect" title="sort-section" class="select select-bordered w-full max-w-48" onchange="filterUsers()">
+                              <option selected>Section</option>
+                              <!-- Sections will be populated dynamically -->
+                          </select>
+                          <select id="sortSelectUsers" title="sort-date" class="select select-bordered w-full max-w-48" onchange="sortUsers()">
+                              <option selected>Sort By</option>
+                              <option value="date">Date Modified</option>
+                              <option value="name">Name</option>
+                              <option value="id">ID</option>
+                          </select>
+                          <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcelAttendance()">
+                              Export
+                          </button>
+                      </div>
+                  </div>
+                  <table class="table" id="attendanceTable">
+                      <thead>
+                          <tr>
+                              <th>#</th>
+                              <th>Name</th>
+                              <th>Status</th>
+                              <th>Grade</th>
+                              <th>Section</th>
+                              <th>Date & Time</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          <!-- User data will be populated here -->
+                      </tbody>
+                  </table>
               </div>
-            </div>     
+            </div>          
           </div>
           <div id="activity" class="page hidden">
-              <div class="rounded p-4">
-                  <h2 class="text-xl font-semibold">Activity Logs</h2>
-                  <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
-                      <div class="flex p-4 justify-between">
-                          <input type="text" placeholder="Search" class="input input-bordered w-full max-w-xs" />
-                          <select title="sort-date" class="select select-bordered w-full max-w-48">
-                              <option disabled selected>Sort By</option>
-                              <option>Date Modified</option>
-                              <option>Name</option>
-                          </select>
+            <div class="rounded p-4">
+              <h2 class="text-xl font-semibold">Activity Logs</h2>
+              <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
+                  <div class="flex p-4 justify-between">
+                      <input type="text" id="searchInputLogs" placeholder="Search" class="input input-bordered w-full max-w-xs" onkeyup="filterLogs()" autocomplete="off"/>
+                      <div class="flex gap-2 w-auto">
+                        <select id="sortSelectLogs" class="select select-bordered w-full max-w-48" onchange="sortLogs()">
+                            <option disabled selected>Sort By</option>
+                            <option value="date">Date Modified</option>
+                            <option value="name">Name</option>
+                            <option value="id">ID</option>
+                        </select>
+                        <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcel()">
+                          Export
+                        </button>
                       </div>
-                      <table class="table" id="activityLogsTable">
-                        <thead>
-                          <!--
+                  </div>
+                  <table class="table" id="activityLogsTable">
+                      <thead>
                           <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>Activity</th>
-                            <th>Date & Time</th>
+                              <th>#</th>
+                              <th>Name</th>
+                              <th>Activity</th>
+                              <th>Date & Time</th>
                           </tr>
-                          -->
-                        </thead>
-                        <tbody>
-                          <!--
-                          <tr>
-                            <th>2</th>
-                            <td>Cy Ganderton</td>
-                            <td>Logged Out</td>
-                            <td>09/17/2024 10:20 pm</td>
-                          </tr>
-                          <tr>
-                            <th>1</th>
-                            <td>Cy Ganderton</td>
-                            <td>Logged In</td>
-                            <td>09/17/2024 10:00 pm</td>
-                          </tr>
-                          -->
-                        </tbody>
-                      </table>
-                    </div>
-              </div>     
+                      </thead>
+                      <tbody>
+                          <!-- Rows will be populated here -->
+                      </tbody>
+                  </table>
+              </div>
+            </div>          
           </div>
           <div id="backup" class="page hidden">
             <div class="rounded p-4">
@@ -333,170 +307,7 @@
   </div>
 
   <script>
-      function showPage(pageId) {
-          document.querySelectorAll('.page').forEach(page => {
-              page.classList.add('hidden');
-          });
-          document.getElementById(pageId).classList.remove('hidden');
 
-          let newTitle = '';
-          switch(pageId) {
-              case 'dashboard':
-                  newTitle = 'Admin | Dashboard';
-                  break;
-              case 'attendance':
-                  newTitle = 'Admin | Attendance Records';
-                  break;
-              case 'activity':
-                  newTitle = 'Admin | Activity Logs';
-                  break;
-              case 'backup':
-                  newTitle = 'Admin | Database Backup';
-                  break;
-              default:
-                  newTitle = 'Admin | Dashboard';
-          }
-          document.title = newTitle;
-
-          document.querySelectorAll('.w-64 ul li a').forEach(link => {
-              link.classList.remove('bg-sky-600');
-          });
-          document.getElementById('link-' + pageId).classList.add('bg-sky-600');
-      }
-
-      showPage('dashboard');
-
-      function updateDateTime() {
-          const now = new Date();
-          const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
-          const optionsTime = { 
-              hour: '2-digit', 
-              minute: '2-digit', 
-              second: '2-digit', 
-              hour12: true 
-          };
-
-          const formattedDate = now.toLocaleDateString(undefined, optionsDate);
-          const formattedTime = now.toLocaleTimeString(undefined, optionsTime);
-
-          document.getElementById('date').textContent = formattedDate;
-          document.getElementById('time').textContent = formattedTime;
-      }
-
-      setInterval(updateDateTime, 1000);
-
-      updateDateTime();
-
-      function fetchAllUsers() {
-          fetch('/admin/get_all_users')
-              .then(response => response.json())
-              .then(data => {
-                  const userTable = document.getElementById('attendanceTable');
-
-                  // Clear existing rows (except for header)
-                  userTable.innerHTML = `
-                      <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Grade</th>
-                        <th>Section</th>
-                        <th>Date & Time</th>
-                      </tr>
-                  `;
-
-                  // Populate table with fetched data
-                  data.forEach(user => {
-                      userTable.innerHTML += `
-                      <tr>
-                        <th>${user.id}</th>
-                        <td>${user.name}</td>
-                        <td>Present</td>
-                        <td>${user.grade_level}</td>
-                        <td>${user.section}</td>
-                        <td>${user.entry_datetime} ${user.period}</td>
-                      </tr>
-                      `;
-                  });
-              })
-              .catch(error => console.error('Error fetching user data:', error));
-      }
-
-      // Call the function when the page loads
-      document.addEventListener('DOMContentLoaded', fetchAllUsers);
-
-      function fetchAllLogs() {
-        fetch('/admin/get_activity_logs')
-            .then(response => {
-                // Check if the response is OK
-                if (!response.ok) {
-                    return response.json().then(errorData => {
-                        throw new Error(errorData.error || 'Failed to fetch logs');
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                const logsTable = document.getElementById('activityLogsTable');
-    
-                // Clear existing rows (except for header)
-                logsTable.innerHTML = `
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Activity</th>
-                      <th>Date & Time</th>
-                    </tr>
-                `;
-    
-                // Check if data is an array
-                if (!Array.isArray(data) || data.length === 0) {
-                    const row = logsTable.insertRow();
-                    const cell = row.insertCell(0);
-                    cell.colSpan = 4;
-                    cell.innerText = 'No activity logs available.';
-                    return;
-                }
-    
-                // Populate table with fetched data
-                data.forEach(log => {
-                    const row = logsTable.insertRow();
-                    row.insertCell(0).innerText = log.id;
-                    row.insertCell(1).innerText = log.name;
-                    row.insertCell(2).innerText = log.activity;
-                    row.insertCell(3).innerText = log.date_time;
-                });
-            })
-            .catch(error => console.error('Error fetching logs data:', error));
-    }
-    
-    // Call the function when the page loads
-    document.addEventListener('DOMContentLoaded', fetchAllLogs);   
-    
-    function confirmBackup() {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/admin/backup';
-      document.body.appendChild(form);
-      form.submit(); // Trigger the download
-      backupDatabase.close(); // Close the modal
-    }
-
-    // Function to fetch the count of unique students
-    async function fetchUniqueStudentCount() {
-      try {
-        const response = await fetch('/admin/count_all_users'); // Updated URL to match the new endpoint
-        const data = await response.json();
-        document.getElementById('unique-student-count').textContent = data.unique_users_count;
-      } catch (error) {
-        console.error('Error fetching student count:', error);
-        document.getElementById('unique-student-count').textContent = 'Error';
-      }
-    }
-
-    // Call the function to fetch the count when the page loads
-    window.onload = fetchUniqueStudentCount;
-    
   </script>
 </body>
 </html>
