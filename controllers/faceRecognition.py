@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for
+from flask import Blueprint, render_template, Response, jsonify, request, redirect, url_for, send_from_directory
 import cv2
 import sqlite3
 from datetime import datetime, timedelta
@@ -48,10 +48,29 @@ def insert_data(name, entry_datetime, period, grade_level, section):
         print(f"Inserting data: {name}, {entry_datetime}, {period}, {grade_level}, {section}")
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("INSERT INTO users (name, entry_datetime, period, grade_level, section) VALUES (?, ?, ?, ?, ?)", 
-                  (name, entry_datetime, period, grade_level, section))
-        conn.commit()
-        print(f"Successfully inserted data for {name}.")
+
+        # Check if the entry already exists for the same user on the same day
+        c.execute("""
+            SELECT COUNT(*) 
+            FROM users 
+            WHERE name = ? AND entry_datetime LIKE ?
+        """, (name, entry_datetime.split(" ")[0] + '%'))  # Check only the date part
+
+        exists = c.fetchone()[0]
+
+        print(f"Exists check: {exists} for {name} on {entry_datetime}")
+
+        if exists == 0:
+            # Insert the new entry
+            c.execute("""
+                INSERT INTO users (name, entry_datetime, period, grade_level, section) 
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, entry_datetime, period, grade_level, section))
+            conn.commit()
+            print(f"Successfully inserted data for {name}.")
+        else:
+            print(f"Data for {name} already exists for this day. No insertion made.")
+    
     except Exception as e:
         print(f"Error inserting data: {e}")
     finally:
@@ -59,6 +78,47 @@ def insert_data(name, entry_datetime, period, grade_level, section):
         
 def async_insert_data(name, entry_datetime, period, grade_level, section):
     threading.Thread(target=insert_data, args=(name, entry_datetime, period, grade_level, section)).start()
+    
+from datetime import datetime, timedelta
+
+def upsert_attendance(name, grade_level, section):
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # Count total attendance from the users table (all entries)
+        c.execute("""
+            SELECT COUNT(*) AS total_attendance 
+            FROM users 
+            WHERE name = ?
+        """, (name,))
+        total_attendance = c.fetchone()[0] or 0  # Default to 0 if None
+
+        # Count weekly attendance from the users table (all entries in the current week)
+        start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
+        c.execute("""
+            SELECT COUNT(*) AS weekly_attendance 
+            FROM users 
+            WHERE name = ? AND entry_datetime >= ?
+        """, (name, start_of_week.strftime('%m/%d/%Y 00:00:00')))
+        weekly_attendance = c.fetchone()[0] or 0  # Default to 0 if None
+
+        # Insert or update the attendance record based on the counts
+        c.execute("""
+            INSERT INTO attendance (name, grade_level, section, total_attendance, weekly_attendance, week)
+            VALUES (?, ?, ?, ?, ?, strftime('%W', 'now'))
+            ON CONFLICT(name) DO UPDATE SET
+                total_attendance = ?,
+                weekly_attendance = ?,
+                week = strftime('%W', 'now')
+        """, (name, grade_level, section, total_attendance, weekly_attendance, total_attendance, weekly_attendance))
+
+        conn.commit()
+        print(f"Successfully updated attendance for {name}.")
+    except Exception as e:
+        print(f"Error updating attendance data: {e}")
+    finally:
+        conn.close()
 
 def get_user_data(name):
     try:
@@ -90,7 +150,6 @@ def get_latest_entry_datetime(name):
     finally:
         conn.close()
 
-
 class VideoCamera:
     def __init__(self):
         self.video = None
@@ -100,7 +159,7 @@ class VideoCamera:
 
     def start(self):
         if not self.running:
-            self.video = cv2.VideoCapture(0)
+            self.video = cv2.VideoCapture(1)
             self.running = True
             self.thread = threading.Thread(target=self.update_frame, daemon=True)
             self.thread.start()
@@ -175,6 +234,46 @@ def async_fetch_user_data(name):
     except Exception as e:
         print(f"Error fetching user data: {e}")
 
+@faceRecognition_bp.route('/datasets/<path:filepath>')
+def serve_image(filepath):
+    datasets_dir = 'datasets'
+    return send_from_directory(datasets_dir, filepath, as_attachment=False)
+
+@faceRecognition_bp.route('/attendance/<string:name>', methods=['GET'])
+def get_attendance(name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get attendance data from the attendance table
+    cursor.execute("SELECT total_attendance, weekly_attendance FROM attendance WHERE name = ?", (name,))
+    attendance_data = cursor.fetchone()
+
+    # Set defaults if no data found
+    if attendance_data:
+        total_attendance = attendance_data['total_attendance']
+        weekly_attendance = attendance_data['weekly_attendance']
+    else:
+        total_attendance = 0
+        weekly_attendance = 0
+
+    conn.close()
+
+    return jsonify({
+        'total_attendance': total_attendance,
+        'weekly_attendance': weekly_attendance
+    })
+    
+def get_user_picture(name, grade_level, section):
+    """
+    Fetch the first picture of the recognized user.
+    """
+    user_folder = os.path.join('datasets', grade_level, section, name)
+    if os.path.isdir(user_folder):
+        images = [f for f in os.listdir(user_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        if images:
+            # Return the relative path for the image
+            return f'{grade_level}/{section}/{name}/{images[0]}'
+    return None  # Return None if no images found or user folder does not exist
 
 # Initialize a dictionary to store the last insertion time for each user
 last_insertion_times = {}
@@ -329,19 +428,23 @@ def generate_frames():
                     current_detection["section"] = section if section else "Unknown"
                     current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")  # Include AM/PM
                     
+                     # Fetch the user's picture path
+                    user_picture_path = get_user_picture(name, grade_level, section)
+                    current_detection["picture_path"] = user_picture_path
+                                    
                     # Insert data into the database if the interval has passed
                     if name not in last_insertion_times:
                         last_insertion_times[name] = now - insert_interval  # Set initial time
 
                     if now - last_insertion_times[name] >= insert_interval:
-                        #insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
-                        async_insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])
+                        async_insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])  
+                        upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
                         last_insertion_times[name] = now  # Update last insertion time
 
                 detected_info.update(current_detection)
                 last_valid_detection = current_detection # Update last valid detection
+                
                 # Fetch current user name
-            
                 threading.Thread(target=async_fetch_user_data, args=(name,)).start()
 
             else:
@@ -365,7 +468,10 @@ def video_feed():
 
 @faceRecognition_bp.route('/get_detected_info')
 def get_detected_info():
+    if not camera_running:  # Check if the camera is running
+        return jsonify({"name": "Unknown", "datetime": None, "grade_level": None, "section": None})  # Default response
     return jsonify(detected_info)
+
     
 
 

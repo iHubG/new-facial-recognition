@@ -6,7 +6,6 @@
     <title>Facial Recognition</title>
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
-    <script src="{{ url_for('static', filename='dist/chart.umd.js') }}"></script>
 </head>
 <body class="bg-sky-100 font-sans h-screen">
     <a href="/" class="absolute top-0 left-0 w-fit p-1 px-4 border border-gray-300 bg-white rounded-full m-5 hover:bg-gray-100">Login as Admin</a>
@@ -26,8 +25,8 @@
             </div>
             <div class="flex w-96 items-center rounded bg-white shadow">
                 <div class="flex flex-col w-2/5 p-2 gap-2 items-center justify-center">
-                    <img src="../static/img/attendance.png" alt="user" class="w-20">
-                    <p class="text-base text-green-500">Present</p>
+                    <img src="../static/img/attendance.png" alt="user" class="w-24 shadow" id="userPicture" style="display: none;">
+                    <!--<p class="text-base text-green-500">Present</p>-->
                 </div>
                 <div class="flex-col w-3/5 p-5 px-0">
                     <h5 class="text-lg font-semibold" id="detected-name">Unknown</h5>
@@ -41,17 +40,18 @@
             <div class="flex flex-col rounded bg-white w-full p-5 px-8 shadow overflow-y-scroll">
                 <h2 class="text-center text-2xl font-semibold">Attendance Record and Statistics</h2>
                 <h5 class="text-lg font-semibold mt-5 mb-2">Statistics</h5>
-                <div class="hidden grid-cols-2 gap-5">
+                <div class="grid grid-cols-2 gap-5">
                     <div class="flex justify-between green-box rounded p-5">
-                        <p>Overall Attendance</p>
-                        <p>80%</p>
+                        <p>Weekly Attendance</p>
+                        <p id="attendance-weekly">Loading...</p>
                     </div>
                     <div class="flex justify-between orange-box rounded p-5">
-                        <p>Overall Absences</p>
-                        <p>20%</p>
+                        <p>Total Attendance</p>
+                        <p id="attendance-total">Loading...</p>
                     </div>
                 </div>
                 <div class="p-4 mt-5 hidden">
+                    <!--
                     <h2>Monthly Data</h2>
                     <canvas id="barChart"></canvas>
                     <script>
@@ -113,7 +113,7 @@
 
                         const ctx = document.getElementById('barChart').getContext('2d');
                         new Chart(ctx, config);
-                    </script>
+                    </script>-->
                 </div>
 
                 <hr class="my-2">
@@ -128,109 +128,14 @@
                     </tr>-->
                    
                 </table>
-                <button class="rounded-full w-fit mx-auto p-2 px-4 text-sm border border-gray-300 hover:bg-gray-100">Load More</button>
+                <!--
+                <button class="rounded-full w-fit mx-auto p-2 px-4 text-sm border border-gray-300 hover:bg-gray-100">Load More</button>-->
 
             </div>
         </section>
     </main> 
     
-    <script>
-        let isFetching = false;
-
-        function fetchData() {
-            if (isFetching) return; // Prevent overlap
-            isFetching = true;
-        
-            const detectedInfoPromise = fetch('/user/get_detected_info')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('detected-name').innerText = data.name || "Unknown";
-                    document.getElementById('detected-time').innerText = data.datetime || "N/A";
-                    const grade = data.grade_level || "N/A";
-                    const section = data.section || "N/A";
-                    document.getElementById('detected-grade-section').innerText = `${grade} - ${section}`;
-                })
-                .catch(error => console.error('Error fetching detected info:', error));
-        
-            const userDataPromise = fetch('/user/current_user')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok: ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(userInfo => {
-                    const name = userInfo.name; // Get the current user's name
-                    return fetchAllUsersData(name); // Fetch user-specific data
-                })
-                .catch(error => console.error('Error fetching user data:', error));
-        
-            Promise.all([detectedInfoPromise, userDataPromise])
-                .then(() => {
-                    // Reset fetching status after both promises resolve
-                    isFetching = false;
-                })
-                .catch(() => {
-                    // Handle errors if any of the fetches fail
-                    isFetching = false;
-                });
-        }
-        
-        // Fetch data every second
-        setInterval(fetchData, 1000);
-        
-        function fetchAllUsersData(name) {
-            if (!name) {
-                console.error("Name is required to fetch user data.");
-                return Promise.resolve(); // Return a resolved promise if name is not provided
-            }
-        
-            let url = `/user/get_all_users_data/${encodeURIComponent(name)}`;
-        
-            return fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok: ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    const userTable = document.getElementById('userTable');
-        
-                    // Clear existing rows (except for header)
-                    userTable.innerHTML = `
-                        <tr class="bg-gray-100">
-                            <th class="text-gray-600 border border-gray-300 p-1">#</th>
-                            <th class="text-gray-600 border border-gray-300 p-1">Name</th>
-                            <th class="text-gray-600 border border-gray-300 p-1">Grade</th>
-                            <th class="text-gray-600 border border-gray-300 p-1">Section</th>
-                            <th class="text-gray-600 border border-gray-300 p-1">Entry Datetime</th>
-                            <th class="text-gray-600 border border-gray-300 p-1">Period</th>
-                        </tr>
-                    `;
-        
-                    // Populate table with fetched data
-                    data.forEach((user, index) => {
-                        userTable.innerHTML += `
-                            <tr>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${index + 1}</td>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.name}</td>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.grade_level}</td>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.section}</td>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.entry_datetime}</td>
-                                <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.period}</td>
-                            </tr>
-                        `;
-                    });
-                })
-                .catch(error => console.error('Error fetching user data:', error));
-        }
-        
-        // Call this function when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchData(); // Initial fetch
-        });
-        
-    </script>
+    <script src="{{ url_for('static', filename='dist/chart.umd.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/faceScript.js') }}" defer></script>
 </body>
 </html>
