@@ -159,7 +159,7 @@ class VideoCamera:
 
     def start(self):
         if not self.running:
-            self.video = cv2.VideoCapture(1)
+            self.video = cv2.VideoCapture(0)
             self.running = True
             self.thread = threading.Thread(target=self.update_frame, daemon=True)
             self.thread.start()

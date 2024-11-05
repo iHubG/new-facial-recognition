@@ -179,6 +179,141 @@ function exportToExcelAttendance() {
 // Call the function when the page loads
 document.addEventListener('DOMContentLoaded', fetchAllUsers);
 
+let registeredUsers = []; // Store the registered users
+
+// Fetch registered users data
+function fetchRegisteredUsers() {
+    fetch('/admin/get_registered_users') // Endpoint for registered users
+        .then(response => response.json())
+        .then(data => {
+            registeredUsers = data; // Store the fetched registered users
+            renderRegisteredUsers(registeredUsers); // Render the users in the table
+        })
+        .catch(error => console.error('Error fetching registered users data:', error));
+}
+
+// Call the function when the page loads
+document.addEventListener('DOMContentLoaded', fetchRegisteredUsers);
+
+// Render the registered users data in the table
+function renderRegisteredUsers(users) {
+    const tbody = document.getElementById('registeredUsersTable').getElementsByTagName('tbody')[0];
+    tbody.innerHTML = ''; // Clear existing rows
+
+    if (!Array.isArray(users) || users.length === 0) {
+        const row = tbody.insertRow();
+        const cell = row.insertCell(0);
+        cell.colSpan = 8;
+        cell.innerText = 'No registered users available.';
+        cell.style.textAlign = 'center';
+        return;
+    }
+
+    users.forEach(user => {
+        const row = tbody.insertRow();
+        row.insertCell(0).innerText = user.id;
+        row.insertCell(1).innerText = user.name;
+        row.insertCell(2).innerText = user.grade_level;
+        row.insertCell(3).innerText = user.section;
+        row.insertCell(4).innerText = user.total_attendance;
+        row.insertCell(5).innerText = user.weekly_attendance;
+        row.insertCell(6).innerText = user.week;
+        row.insertCell(7).innerText = user.date_created;
+    });
+}
+
+// Filter registered users based on search, grade, and section
+function filterRegisteredUsers() {
+    const searchInput = document.getElementById('searchInputRegisteredUsers').value.toLowerCase();
+    const selectedGrade = document.getElementById('gradeSelectRegisteredUsers').value;
+    const selectedSection = document.getElementById('sectionSelectRegisteredUsers').value;
+
+    const filteredUsers = registeredUsers.filter(user => {
+        const matchesSearch = 
+            (user.name && user.name.toLowerCase().includes(searchInput)) ||
+            (user.grade_level && user.grade_level.toLowerCase().includes(searchInput)) ||
+            (user.section && user.section.toLowerCase().includes(searchInput)) ||
+            (user.date_created && user.date_created.toLowerCase().includes(searchInput));
+
+        const matchesGrade = selectedGrade === "Grade Level" || user.grade_level === selectedGrade;
+        const matchesSection = selectedSection === "Section" || user.section === selectedSection;
+
+        return matchesSearch && matchesGrade && matchesSection;
+    });
+
+    renderRegisteredUsers(filteredUsers); // Render the filtered users
+}
+
+// Sort registered users based on selected criteria
+function sortRegisteredUsers() {
+    const sortBy = document.getElementById('sortSelectRegisteredUsers').value;
+    let sortedUsers;
+
+    if (sortBy === 'date') {
+        sortedUsers = [...registeredUsers].sort((a, b) => new Date(b.date_created) - new Date(a.date_created));
+    } else if (sortBy === 'name') {
+        sortedUsers = [...registeredUsers].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'id') {
+        sortedUsers = [...registeredUsers].sort((a, b) => a.id - b.id); // Sort by ID
+    } else {
+        return; // No sorting if the default option is selected
+    }
+
+    renderRegisteredUsers(sortedUsers); // Render the sorted users
+}
+
+// Excel export for registered users
+function exportToExcelRegisteredUsers() {
+    const formattedData = registeredUsers.map(user => ({
+        id: user.id,
+        name: user.name,
+        grade_level: user.grade_level,
+        section: user.section,
+        total_attendance: user.total_attendance,
+        weekly_attendance: user.weekly_attendance,
+        week: user.week,
+        date_created: user.date_created
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(formattedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Registered Users");
+    XLSX.writeFile(wb, "registered_users.xlsx");
+}
+
+// Customize sections for each grade for registered users
+const gradeSectionsForRegisteredUsers = {
+    "grade_7": ["section_1", "section_2", "section_3"],
+    "grade_8": ["section_1", "section_4", "section_5"],
+    "grade_9": ["section_2", "section_6"],
+    "grade_10": ["section_3", "section_7"],
+    "grade_11": ["section_1", "section_2"],
+    "grade_12": ["section_1", "section_2"]
+};
+
+// Update sections based on the selected grade for registered users
+function updateSectionsRegisteredUsers() {
+    const gradeSelect = document.getElementById('gradeSelectRegisteredUsers');
+    const sectionSelect = document.getElementById('sectionSelectRegisteredUsers');
+    const selectedGrade = gradeSelect.value;
+
+    // Clear existing sections
+    sectionSelect.innerHTML = '<option selected>Section</option>';
+
+    // Populate sections based on the selected grade
+    if (selectedGrade && gradeSectionsForRegisteredUsers[selectedGrade]) {
+        gradeSectionsForRegisteredUsers[selectedGrade].forEach(section => {
+            const option = document.createElement('option');
+            option.value = section;
+            option.textContent = section.replace('_', ' ').replace('section ', 'Section '); // Format nicely
+            sectionSelect.appendChild(option);
+        });
+    }
+}
+
+// Call the function to update sections when the page loads
+document.addEventListener('DOMContentLoaded', updateSectionsRegisteredUsers);
+
 
 let allLogs = []; // Store the fetched logs
 

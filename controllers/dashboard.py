@@ -50,6 +50,15 @@ def get_all_users():
     users_list = [dict(user) for user in users]
     return jsonify(users_list)
 
+@dashboard_bp.route('/get_registered_users', methods=['GET'])
+def get_registered_users():
+    conn = get_db_connection()
+    attendances = conn.execute('SELECT * FROM attendance').fetchall()
+    conn.close()
+    
+    attendance_list = [dict(attendance) for attendance in attendances]
+    return jsonify(attendance_list)
+
 @dashboard_bp.route('/count_all_users', methods=['GET'])
 def count_all_users():
     conn = get_db_connection()

@@ -9,10 +9,10 @@ function fetchData() {
         .then(data => {
             // Update UI with detected info
             document.getElementById('detected-name').innerText = data.name || "Unknown";
-            document.getElementById('detected-time').innerText = data.datetime || "N/A";
-            const grade = data.grade_level || "N/A";
-            const section = data.section || "N/A";
-            document.getElementById('detected-grade-section').innerText = `${grade} - ${section}`;
+            document.getElementById('detected-time').innerText = data.datetime || "";
+            const grade = data.grade_level || "";
+            const section = data.section || "";
+            document.getElementById('detected-grade-section').innerText = `${grade} ${section}`;
 
             // Set the image source if the user is recognized
             const userPicture = document.getElementById('userPicture');

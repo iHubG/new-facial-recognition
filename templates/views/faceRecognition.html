@@ -39,7 +39,7 @@
         <section class="col-span-6 flex 2xl:p-5">
             <div class="flex flex-col rounded bg-white w-full p-5 px-8 shadow overflow-y-scroll">
                 <h2 class="text-center text-2xl font-semibold">Attendance Record and Statistics</h2>
-                <h5 class="text-lg font-semibold mt-5 mb-2">Statistics</h5>
+                <h5 class="text-lg font-semibold mt-5 mb-4">Statistics</h5>
                 <div class="grid grid-cols-2 gap-5">
                     <div class="flex justify-between green-box rounded p-5">
                         <p>Weekly Attendance</p>
@@ -50,8 +50,9 @@
                         <p id="attendance-total">Loading...</p>
                     </div>
                 </div>
+                <!--
                 <div class="p-4 mt-5 hidden">
-                    <!--
+                    
                     <h2>Monthly Data</h2>
                     <canvas id="barChart"></canvas>
                     <script>
@@ -113,12 +114,12 @@
 
                         const ctx = document.getElementById('barChart').getContext('2d');
                         new Chart(ctx, config);
-                    </script>-->
-                </div>
+                    </script>
+                </div>-->
 
-                <hr class="my-2">
+                <hr class="my-8">
 
-                <h5 class="text-lg font-semibold mt-5 mb-2">Previous Attendance</h5>
+                <h5 class="text-lg font-semibold mb-4">Previous Attendance</h5>
                 <table class="mb-5" id="userTable">
                     <!--
                     <tr class="bg-gray-100">

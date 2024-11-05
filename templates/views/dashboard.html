@@ -204,7 +204,7 @@
           <div id="attendance" class="page hidden">
             <div class="rounded p-4">
               <h2 class="text-xl font-semibold">Attendance Records</h2>
-              <div class="overflow-x-auto bg-white mt-5 rounded shadow p-4">
+              <div class="bg-white mt-5 rounded shadow p-4 overflow-y-auto h-screen">
                   <div class="flex p-4 justify-between">
                       <input type="text" id="searchInputUsers" placeholder="Search" class="input input-bordered w-full max-w-xs" oninput="filterUsers()" />
                       <div class="flex gap-2">
@@ -248,6 +248,54 @@
                       </tbody>
                   </table>
               </div>
+
+                <h2 class="text-xl font-semibold mt-10">Registered Users</h2>
+                <div class="bg-white mt-5 rounded shadow p-4 overflow-y-auto h-screen">
+                  <div class="flex p-4 justify-between">
+                    <input type="text" id="searchInputRegisteredUsers" placeholder="Search" class="input input-bordered w-full max-w-xs" oninput="filterRegisteredUsers()" />
+                    <div class="flex gap-2">
+                        <select id="gradeSelectRegisteredUsers" title="sort-grade" class="select select-bordered w-full max-w-48" onchange="updateSectionsRegisteredUsers()">
+                            <option selected>Grade Level</option>
+                            <option value="grade_7">Grade 7</option>
+                            <option value="grade_8">Grade 8</option>
+                            <option value="grade_9">Grade 9</option>
+                            <option value="grade_10">Grade 10</option>
+                            <option value="grade_11">Grade 11</option>
+                            <option value="grade_12">Grade 12</option>
+                        </select>
+                        <select id="sectionSelectRegisteredUsers" title="sort-section" class="select select-bordered w-full max-w-48" onchange="filterRegisteredUsers()">
+                            <option selected>Section</option>
+                            <!-- Sections will be populated dynamically -->
+                        </select>
+                        <select id="sortSelectRegisteredUsers" title="sort-date" class="select select-bordered w-full max-w-48" onchange="sortRegisteredUsers()">
+                            <option selected>Sort By</option>
+                            <option value="date">Date Modified</option>
+                            <option value="name">Name</option>
+                            <option value="id">ID</option>
+                        </select>
+                        <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcelRegisteredUsers()">
+                            Export
+                        </button>
+                    </div>
+                  </div>
+                  <table class="table" id="registeredUsersTable">
+                      <thead>
+                          <tr>
+                              <th>#</th>
+                              <th>Name</th>
+                              <th>Grade</th>
+                              <th>Section</th>
+                              <th>Total Attendance</th>
+                              <th>Weekly Attendance</th>
+                              <th>Week</th>
+                              <th>Date Created</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          <!-- User data will be populated here -->
+                      </tbody>
+                  </table>
+                </div>
             </div>          
           </div>
           <div id="activity" class="page hidden">
