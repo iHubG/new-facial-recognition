@@ -11,15 +11,13 @@ def create_table():
     cursor = conn.cursor()
 
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS attendance (
+        CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            grade_level TEXT NOT NULL,
-            section TEXT NOT NULL,
-            total_attendance INTEGER DEFAULT 0,
-            weekly_attendance INTEGER,
-            week INTEGER,
-            date_created TEXT DEFAULT CURRENT_TIMESTAMP
+            name TEXT NOT NULL,
+            entry_datetime TEXT,
+            period TEXT,   
+            section TEXT, 
+            grade_level TEXT
         )
     ''')
 
