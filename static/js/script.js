@@ -95,7 +95,7 @@ function renderUsers(users) {
         row.insertCell(2).innerText = user.status || "Present"; // Default status if missing
         row.insertCell(3).innerText = user.grade_level;
         row.insertCell(4).innerText = user.section;
-        row.insertCell(5).innerText = user.entry_datetime; // Adjust if needed
+        row.insertCell(5).innerText = user.entry_datetime + " " + user.period;
     });
 }
 
@@ -435,3 +435,131 @@ async function fetchUniqueStudentCount() {
 
 // Call the function to fetch the count when the page loads
 window.onload = fetchUniqueStudentCount;
+
+
+function printAttendance() {
+    const table = document.getElementById('attendanceTable');
+    const printWindow = window.open('', '', 'height=600,width=800');
+    
+    printWindow.document.write('<html><head><title>Print Attendance</title>');
+    printWindow.document.write('<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/output.css\') }}">'); // Include your CSS for styling
+    printWindow.document.write(`
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            .logo {
+                width: 150px; /* Adjust the width as necessary */
+                margin-bottom: 20px; /* Space below the logo */
+            }
+        </style>
+    `);
+    printWindow.document.write('</head><body>');
+    
+    // Add the logo
+    printWindow.document.write('<img src="{{ url_for(\'static\', filename=\'img/school-logo.png\') }}" class="logo" alt="School Logo" style="display: block; margin-left: auto; margin-right: auto;">');
+    
+    printWindow.document.write('<h2>Attendance Records</h2>');
+    printWindow.document.write(table.outerHTML);
+    printWindow.document.write('</body></html>');
+    
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function printRegistered() {
+    const table = document.getElementById('registeredUsersTable');
+    const printWindow = window.open('', '', 'height=600,width=800');
+    
+    printWindow.document.write('<html><head><title>Print Registered Users</title>');
+    printWindow.document.write('<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/output.css\') }}">'); // Include your CSS for styling
+    printWindow.document.write(`
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            .logo {
+                width: 150px; /* Adjust the width as necessary */
+                margin-bottom: 20px; /* Space below the logo */
+            }
+        </style>
+    `);
+    printWindow.document.write('</head><body>');
+    
+    // Add the logo
+    printWindow.document.write('<img src="{{ url_for(\'static\', filename=\'img/school-logo.png\') }}" class="logo" alt="School Logo" style="display: block; margin-left: auto; margin-right: auto;">');
+    
+    printWindow.document.write('<h2>Registered Users</h2>');
+    printWindow.document.write(table.outerHTML);
+    printWindow.document.write('</body></html>');
+    
+    printWindow.document.close();
+    printWindow.print();
+}
+
+
+function printLogs() {
+    const table = document.getElementById('activityLogsTable');
+    const printWindow = window.open('', '', 'height=600,width=800');
+    
+    printWindow.document.write('<html><head><title>Print Activity Logs</title>');
+    printWindow.document.write('<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/output.css\') }}">'); // Include your CSS for styling
+    printWindow.document.write(`
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            .logo {
+                width: 150px; /* Adjust the width as necessary */
+                margin-bottom: 20px; /* Space below the logo */
+            }
+        </style>
+    `);
+    printWindow.document.write('</head><body>');
+    
+    // Add the logo
+    printWindow.document.write('<img src="{{ url_for(\'static\', filename=\'img/school-logo.png\') }}" class="logo" alt="School Logo" style="display: block; margin-left: auto; margin-right: auto;">');
+    
+    printWindow.document.write('<h2>Activity Logs</h2>');
+    printWindow.document.write(table.outerHTML);
+    printWindow.document.write('</body></html>');
+    
+    printWindow.document.close();
+    printWindow.print();
+}

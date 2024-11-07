@@ -19,7 +19,7 @@ def create_table():
             total_attendance INTEGER DEFAULT 0,
             weekly_attendance INTEGER,
             week INTEGER,
-            date_created TEXT DEFAULT CURRENT_TIMESTAMP
+            date_created TEXT 
         )
     ''')
 

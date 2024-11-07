@@ -13,6 +13,7 @@ import time
 import logging
 from collections import deque
 import requests
+import pytz
 
 # Initialize logging
 logging.basicConfig(filename='face_recognition.log', level=logging.INFO)
@@ -78,8 +79,6 @@ def insert_data(name, entry_datetime, period, grade_level, section):
         
 def async_insert_data(name, entry_datetime, period, grade_level, section):
     threading.Thread(target=insert_data, args=(name, entry_datetime, period, grade_level, section)).start()
-    
-from datetime import datetime, timedelta
 
 def upsert_attendance(name, grade_level, section):
     try:
@@ -103,15 +102,21 @@ def upsert_attendance(name, grade_level, section):
         """, (name, start_of_week.strftime('%m/%d/%Y 00:00:00')))
         weekly_attendance = c.fetchone()[0] or 0  # Default to 0 if None
 
+        # Get the current timestamp in Philippine Time (PHT)
+        timezone = pytz.timezone('Asia/Manila')
+        now = datetime.now(timezone)
+        formatted_timestamp = now.strftime('%m/%d/%Y %I:%M:%S %p')  # Format to 12-hour clock with AM/PM
+
         # Insert or update the attendance record based on the counts
         c.execute("""
-            INSERT INTO attendance (name, grade_level, section, total_attendance, weekly_attendance, week)
-            VALUES (?, ?, ?, ?, ?, strftime('%W', 'now'))
+            INSERT INTO attendance (name, grade_level, section, total_attendance, weekly_attendance, week, date_created)
+            VALUES (?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
             ON CONFLICT(name) DO UPDATE SET
                 total_attendance = ?,
                 weekly_attendance = ?,
-                week = strftime('%W', 'now')
-        """, (name, grade_level, section, total_attendance, weekly_attendance, total_attendance, weekly_attendance))
+                week = strftime('%W', 'now'),
+                date_created = ?
+        """, (name, grade_level, section, total_attendance, weekly_attendance, formatted_timestamp, total_attendance, weekly_attendance, formatted_timestamp))
 
         conn.commit()
         print(f"Successfully updated attendance for {name}.")

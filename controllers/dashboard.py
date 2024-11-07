@@ -63,7 +63,7 @@ def get_registered_users():
 def count_all_users():
     conn = get_db_connection()
     # Count distinct names directly in the query
-    count = conn.execute('SELECT COUNT(DISTINCT name) FROM users').fetchone()[0]
+    count = conn.execute('SELECT COUNT(DISTINCT name) FROM attendance').fetchone()[0]
     conn.close()
     
     return jsonify({'unique_users_count': count})

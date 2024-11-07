@@ -1,4 +1,5 @@
 let isFetching = false;
+let currentUserName = ""; // Variable to store the current user's name
 
 function fetchData() {
     if (isFetching) return; // Prevent overlap
@@ -23,11 +24,14 @@ function fetchData() {
                 userPicture.style.display = 'none'; // Hide the image if unknown
             }
 
+            // Store the current user's name for attendance fetching
+            currentUserName = data.name || "";
+
             // Fetch user data only if a user is detected
-            if (data.name) {
+            if (currentUserName) {
                 return Promise.all([
-                    fetchAllUsersData(data.name),
-                    fetchAttendance(data.name) // Fetch attendance data
+                    fetchAllUsersData(currentUserName),
+                    fetchAttendance(currentUserName) // Fetch attendance data
                 ]);
             }
         })
@@ -112,3 +116,8 @@ function fetchAttendance(name) {
 document.addEventListener('DOMContentLoaded', () => {
     fetchData(); // Initial fetch
 });
+
+// Set an interval for fetching attendance using the current user's name
+setInterval(() => {
+    fetchAttendance(currentUserName); // Pass the current user's name
+}, 1000);

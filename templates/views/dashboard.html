@@ -227,8 +227,11 @@
                               <option value="name">Name</option>
                               <option value="id">ID</option>
                           </select>
-                          <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcelAttendance()">
+                          <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcelAttendance()">
                               Export
+                          </button>
+                          <button id="printBtn" class="w-auto flex items-center justify-center bg-sky-200 p-2 px-4 rounded-lg hover:opacity-80" onclick="printAttendance()">
+                            Print
                           </button>
                       </div>
                   </div>
@@ -276,6 +279,9 @@
                         <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcelRegisteredUsers()">
                             Export
                         </button>
+                        <button id="printBtn" class="w-auto flex items-center justify-center bg-sky-200 p-2 px-4 rounded-lg hover:opacity-80" onclick="printRegistered()">
+                          Print
+                        </button>
                     </div>
                   </div>
                   <table class="table" id="registeredUsersTable">
@@ -313,6 +319,9 @@
                         </select>
                         <button id="exportBtn" class="w-auto flex items-center justify-center bg-green-200 dark:bg-green-700 text-gray-800 dark:text-gray-300 p-2 px-4 rounded-lg hover:opacity-80" onclick="exportToExcel()">
                           Export
+                        </button>
+                        <button id="printBtn" class="w-auto flex items-center justify-center bg-sky-200 p-2 px-4 rounded-lg hover:opacity-80" onclick="printLogs()">
+                          Print
                         </button>
                       </div>
                   </div>
