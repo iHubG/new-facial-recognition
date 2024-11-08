@@ -44,7 +44,7 @@ def logout():
 @dashboard_bp.route('/get_all_users', methods=['GET'])
 def get_all_users():
     conn = get_db_connection()
-    users = conn.execute('SELECT * FROM users').fetchall()
+    users = conn.execute('SELECT * FROM attendance').fetchall()
     conn.close()
     
     users_list = [dict(user) for user in users]
@@ -53,7 +53,7 @@ def get_all_users():
 @dashboard_bp.route('/get_registered_users', methods=['GET'])
 def get_registered_users():
     conn = get_db_connection()
-    attendances = conn.execute('SELECT * FROM attendance').fetchall()
+    attendances = conn.execute('SELECT * FROM users').fetchall()
     conn.close()
     
     attendance_list = [dict(attendance) for attendance in attendances]
@@ -63,7 +63,7 @@ def get_registered_users():
 def count_all_users():
     conn = get_db_connection()
     # Count distinct names directly in the query
-    count = conn.execute('SELECT COUNT(DISTINCT name) FROM attendance').fetchone()[0]
+    count = conn.execute('SELECT COUNT(DISTINCT name) FROM users').fetchone()[0]
     conn.close()
     
     return jsonify({'unique_users_count': count})

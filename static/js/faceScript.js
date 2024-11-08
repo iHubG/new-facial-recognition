@@ -69,8 +69,8 @@ function fetchAllUsersData(name) {
                     <th class="text-gray-600 border border-gray-300 p-1">Name</th>
                     <th class="text-gray-600 border border-gray-300 p-1">Grade</th>
                     <th class="text-gray-600 border border-gray-300 p-1">Section</th>
-                    <th class="text-gray-600 border border-gray-300 p-1">Entry Datetime</th>
-                    <th class="text-gray-600 border border-gray-300 p-1">Period</th>
+                    <th class="text-gray-600 border border-gray-300 p-1">Time In</th>
+                    <th class="text-gray-600 border border-gray-300 p-1">Time Out</th>
                 </tr>
             `;
 
@@ -82,8 +82,8 @@ function fetchAllUsersData(name) {
                         <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.name}</td>
                         <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.grade_level}</td>
                         <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.section}</td>
-                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.entry_datetime}</td>
-                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.period}</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.time_in}</td>
+                        <td class="text-gray-600 border-b border-gray-300 p-1 text-center">${user.time_out}</td>
                     </tr>
                 `;
             });

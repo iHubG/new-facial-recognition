@@ -13,13 +13,11 @@ def create_table():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            grade_level TEXT NOT NULL,
-            section TEXT NOT NULL,
-            total_attendance INTEGER DEFAULT 0,
-            weekly_attendance INTEGER,
-            week INTEGER,
-            date_created TEXT 
+            name TEXT NOT NULL,  
+            section TEXT, 
+            grade_level TEXT,
+            time_in TEXT,
+            time_out TEXT
         )
     ''')
 

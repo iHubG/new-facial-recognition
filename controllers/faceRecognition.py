@@ -44,41 +44,59 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def insert_data(name, entry_datetime, period, grade_level, section):
+def insert_data(name, time_in, time_out, grade_level, section):
     try:
-        print(f"Inserting data: {name}, {entry_datetime}, {period}, {grade_level}, {section}")
+        print(f"Inserting data: {name}, {time_in}, {time_out}, {grade_level}, {section}")
+        
+        # If time_out is empty, set it to None to indicate that the user hasn't timed out yet
+        time_out = time_out if time_out else None
+
         conn = get_db_connection()
         c = conn.cursor()
 
-        # Check if the entry already exists for the same user on the same day
+        # Use only the date part of time_in (ignore the time) for matching
+        time_in_date = time_in.split(" ")[0]  # Get only the date portion (e.g., "11/09/2024")
+
+        # Check if the user has already checked in today (based on the date)
         c.execute("""
-            SELECT COUNT(*) 
-            FROM users 
-            WHERE name = ? AND entry_datetime LIKE ?
-        """, (name, entry_datetime.split(" ")[0] + '%'))  # Check only the date part
+            SELECT time_in, time_out 
+            FROM attendance 
+            WHERE name = ? AND time_in LIKE ?
+        """, (name, time_in_date + '%'))  # Check only the date part (ignore time)
 
-        exists = c.fetchone()[0]
+        existing_record = c.fetchone()
 
-        print(f"Exists check: {exists} for {name} on {entry_datetime}")
-
-        if exists == 0:
-            # Insert the new entry
-            c.execute("""
-                INSERT INTO users (name, entry_datetime, period, grade_level, section) 
-                VALUES (?, ?, ?, ?, ?)
-            """, (name, entry_datetime, period, grade_level, section))
-            conn.commit()
-            print(f"Successfully inserted data for {name}.")
+        if existing_record:
+            # Record exists, check if time_out is already set
+            if existing_record[1] is None:
+                # If `time_out` is None, this means we are updating the record to set `time_out`
+                print(f"Updating time_out for {name} at {time_out}.")
+                c.execute("""
+                    UPDATE attendance 
+                    SET time_out = ? 
+                    WHERE name = ? AND time_in LIKE ?
+                """, (time_out, name, time_in_date + '%'))
+                conn.commit()
+                print(f"Successfully updated time_out for {name} to {time_out}.")
+            else:
+                print(f"Data for {name} already exists and is complete. No update needed.")
         else:
-            print(f"Data for {name} already exists for this day. No insertion made.")
-    
+            # Insert a new record for the person with time_in and NULL time_out
+            print(f"Inserting new time_in for {name} at {time_in}.")
+            c.execute("""
+                INSERT INTO attendance (name, time_in, time_out, grade_level, section) 
+                VALUES (?, ?, NULL, ?, ?)
+            """, (name, time_in, grade_level, section))
+            conn.commit()
+            print(f"Successfully inserted time_in for {name}.")
+
     except Exception as e:
-        print(f"Error inserting data: {e}")
+        print(f"Error inserting or updating data: {e}")
     finally:
         conn.close()
         
-def async_insert_data(name, entry_datetime, period, grade_level, section):
-    threading.Thread(target=insert_data, args=(name, entry_datetime, period, grade_level, section)).start()
+def async_insert_data(name, time_in, time_out, grade_level, section):
+    threading.Thread(target=insert_data, args=(name, time_in, time_out, grade_level, section)).start()
 
 def upsert_attendance(name, grade_level, section):
     try:
@@ -88,7 +106,7 @@ def upsert_attendance(name, grade_level, section):
         # Count total attendance from the users table (all entries)
         c.execute("""
             SELECT COUNT(*) AS total_attendance 
-            FROM users 
+            FROM attendance 
             WHERE name = ?
         """, (name,))
         total_attendance = c.fetchone()[0] or 0  # Default to 0 if None
@@ -97,8 +115,8 @@ def upsert_attendance(name, grade_level, section):
         start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
         c.execute("""
             SELECT COUNT(*) AS weekly_attendance 
-            FROM users 
-            WHERE name = ? AND entry_datetime >= ?
+            FROM attendance 
+            WHERE name = ? AND time_in >= ?
         """, (name, start_of_week.strftime('%m/%d/%Y 00:00:00')))
         weekly_attendance = c.fetchone()[0] or 0  # Default to 0 if None
 
@@ -109,7 +127,7 @@ def upsert_attendance(name, grade_level, section):
 
         # Insert or update the attendance record based on the counts
         c.execute("""
-            INSERT INTO attendance (name, grade_level, section, total_attendance, weekly_attendance, week, date_created)
+            INSERT INTO users (name, grade_level, section, total_attendance, weekly_attendance, week, date_created)
             VALUES (?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
             ON CONFLICT(name) DO UPDATE SET
                 total_attendance = ?,
@@ -129,7 +147,7 @@ def get_user_data(name):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT grade_level, section FROM users WHERE name = ?", (name,))
+        c.execute("SELECT grade_level, section FROM attendance WHERE name = ?", (name,))
         result = c.fetchone()
         return {
             'grade_level': result[0],
@@ -154,6 +172,17 @@ def get_latest_entry_datetime(name):
         return None
     finally:
         conn.close()
+        
+timezone = pytz.timezone('Asia/Manila')
+
+# Helper function to check if the current time is in the specified time range in 12-hour format with AM/PM
+def is_within_time_range(current_time, start_time, end_time):
+    """
+    Helper function to check if the current time is within a specific time range in 12-hour format with AM/PM.
+    Time format should be HH:MM AM/PM.
+    """
+    current_time = current_time.strftime('%I:%M %p')  # Convert current time to 12-hour format with AM/PM
+    return start_time <= current_time <= end_time
 
 class VideoCamera:
     def __init__(self):
@@ -217,8 +246,8 @@ def toggle_camera():
 def get_user_data(name):
     conn = get_db_connection()
     query = '''
-        SELECT name, entry_datetime, period, section, grade_level 
-        FROM users 
+        SELECT name, time_in, time_out, section, grade_level 
+        FROM attendance 
         WHERE name = ? 
         ORDER BY id DESC  
         LIMIT 5
@@ -243,30 +272,6 @@ def async_fetch_user_data(name):
 def serve_image(filepath):
     datasets_dir = 'datasets'
     return send_from_directory(datasets_dir, filepath, as_attachment=False)
-
-@faceRecognition_bp.route('/attendance/<string:name>', methods=['GET'])
-def get_attendance(name):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Get attendance data from the attendance table
-    cursor.execute("SELECT total_attendance, weekly_attendance FROM attendance WHERE name = ?", (name,))
-    attendance_data = cursor.fetchone()
-
-    # Set defaults if no data found
-    if attendance_data:
-        total_attendance = attendance_data['total_attendance']
-        weekly_attendance = attendance_data['weekly_attendance']
-    else:
-        total_attendance = 0
-        weekly_attendance = 0
-
-    conn.close()
-
-    return jsonify({
-        'total_attendance': total_attendance,
-        'weekly_attendance': weekly_attendance
-    })
     
 def get_user_picture(name, grade_level, section):
     """
@@ -343,6 +348,7 @@ recognized_users = {}
 
 current_user_name = "Unknown"
 
+# Insert or update data based on time-based conditions (morning and afternoon)
 def generate_frames():
     global detected_info, current_user_name
     last_valid_detection = detected_info.copy()
@@ -409,7 +415,7 @@ def generate_frames():
 
                 # Current date and time
                 now = datetime.now()
-                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S")  # 12-hour format with AM/PM
+                entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
 
                 if name != "Unknown":
                     current_detection["name"] = name
@@ -431,26 +437,48 @@ def generate_frames():
 
                     current_detection["grade_level"] = grade_level if grade_level else "Unknown"
                     current_detection["section"] = section if section else "Unknown"
-                    current_detection["datetime"] = entry_datetime + " " + now.strftime("%p")  # Include AM/PM
-                    
-                     # Fetch the user's picture path
+                    current_detection["datetime"] = entry_datetime   # Include AM/PM
+
+                    # Fetch the user's picture path
                     user_picture_path = get_user_picture(name, grade_level, section)
                     current_detection["picture_path"] = user_picture_path
-                                    
-                    # Insert data into the database if the interval has passed
+
+                    # Get current time in hours and minutes for time-based recognition
+                    current_hour = now.hour
+
+                    # Determine if it's morning (6:00 AM to 10:00 AM) or afternoon (3:00 PM to 6:00 PM)
                     if name not in last_insertion_times:
                         last_insertion_times[name] = now - insert_interval  # Set initial time
 
+                    # Only insert or update if the time interval has passed
                     if now - last_insertion_times[name] >= insert_interval:
-                        async_insert_data(name, entry_datetime, now.strftime("%p"), current_detection["grade_level"], current_detection["section"])  
-                        upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
-                        last_insertion_times[name] = now  # Update last insertion time
+
+                        # **Morning: Time-in (6:00 AM to 10:00 AM)**
+                        if 1 <= current_hour < 2:
+                            print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
+
+                            # Insert the time_in (with time_out = NULL)
+                            async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"])
+                            upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
+
+                        # **Afternoon: Time-out (3:00 PM to 6:00 PM)**
+                        elif 2 <= current_hour < 18:
+                            print(f"Recognized {name} for check-out (3:00 PM - 6:00 PM)")
+
+                            # Update the time_out for the same day
+                            current_time_str = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
+                            async_insert_data(name, entry_datetime, current_time_str, current_detection["grade_level"], current_detection["section"])
+                            upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
+
+                        # Update the last insertion time regardless of whether it's a check-in or check-out
+                        last_insertion_times[name] = now
 
                 detected_info.update(current_detection)
-                last_valid_detection = current_detection # Update last valid detection
+                last_valid_detection = current_detection  # Update last valid detection
                 
-                # Fetch current user name
+                # Fetch current user data in a separate thread (asynchronously)
                 threading.Thread(target=async_fetch_user_data, args=(name,)).start()
+
 
             else:
                 detected_info.update(last_valid_detection)
@@ -462,6 +490,30 @@ def generate_frames():
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        
+@faceRecognition_bp.route('/attendance/<string:name>', methods=['GET'])
+def get_attendance(name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get attendance data from the attendance table
+    cursor.execute("SELECT total_attendance, weekly_attendance FROM users WHERE name = ?", (name,))
+    attendance_data = cursor.fetchone()
+
+    # Set defaults if no data found
+    if attendance_data:
+        total_attendance = attendance_data['total_attendance']
+        weekly_attendance = attendance_data['weekly_attendance']
+    else:
+        total_attendance = 0
+        weekly_attendance = 0
+
+    conn.close()
+
+    return jsonify({
+        'total_attendance': total_attendance,
+        'weekly_attendance': weekly_attendance
+    })
 
 @faceRecognition_bp.route('/current_user', methods=['GET'])
 def current_user(): 

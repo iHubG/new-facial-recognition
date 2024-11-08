@@ -95,7 +95,8 @@ function renderUsers(users) {
         row.insertCell(2).innerText = user.status || "Present"; // Default status if missing
         row.insertCell(3).innerText = user.grade_level;
         row.insertCell(4).innerText = user.section;
-        row.insertCell(5).innerText = user.entry_datetime + " " + user.period;
+        row.insertCell(5).innerText = user.time_in;
+        row.insertCell(6).innerText = user.time_out;
     });
 }
 
@@ -166,7 +167,8 @@ function exportToExcelAttendance() {
         status: row.cells[2].innerText,
         grade: row.cells[3].innerText,
         section: row.cells[4].innerText,
-        date_time: row.cells[5].innerText,
+        time_in: row.cells[5].innerText,
+        time_out: row.cells[6].innerText,
     }));
 
     const ws = XLSX.utils.json_to_sheet(formattedLogs);
