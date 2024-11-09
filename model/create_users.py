@@ -16,6 +16,7 @@ def create_table():
             name TEXT NOT NULL UNIQUE,
             grade_level TEXT NOT NULL,
             section TEXT NOT NULL,
+            user_type TEXT NOT NULL,
             total_attendance INTEGER DEFAULT 0,
             weekly_attendance INTEGER,
             week INTEGER,

@@ -98,7 +98,7 @@ def insert_data(name, time_in, time_out, grade_level, section):
 def async_insert_data(name, time_in, time_out, grade_level, section):
     threading.Thread(target=insert_data, args=(name, time_in, time_out, grade_level, section)).start()
 
-def upsert_attendance(name, grade_level, section):
+def upsert_attendance(name, grade_level, section, user_type):
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -127,14 +127,14 @@ def upsert_attendance(name, grade_level, section):
 
         # Insert or update the attendance record based on the counts
         c.execute("""
-            INSERT INTO users (name, grade_level, section, total_attendance, weekly_attendance, week, date_created)
-            VALUES (?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
+            INSERT INTO users (name, grade_level, section, user_type, total_attendance, weekly_attendance, week, date_created)
+            VALUES (?, ?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
             ON CONFLICT(name) DO UPDATE SET
                 total_attendance = ?,
                 weekly_attendance = ?,
                 week = strftime('%W', 'now'),
                 date_created = ?
-        """, (name, grade_level, section, total_attendance, weekly_attendance, formatted_timestamp, total_attendance, weekly_attendance, formatted_timestamp))
+        """, (name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp, total_attendance, weekly_attendance, formatted_timestamp))
 
         conn.commit()
         print(f"Successfully updated attendance for {name}.")
@@ -158,7 +158,7 @@ def get_user_data(name):
         return None
     finally:
         conn.close()
-
+'''
 def get_latest_entry_datetime(name):
     try:
         conn = get_db_connection()
@@ -172,17 +172,7 @@ def get_latest_entry_datetime(name):
         return None
     finally:
         conn.close()
-        
-timezone = pytz.timezone('Asia/Manila')
-
-# Helper function to check if the current time is in the specified time range in 12-hour format with AM/PM
-def is_within_time_range(current_time, start_time, end_time):
-    """
-    Helper function to check if the current time is within a specific time range in 12-hour format with AM/PM.
-    Time format should be HH:MM AM/PM.
-    """
-    current_time = current_time.strftime('%I:%M %p')  # Convert current time to 12-hour format with AM/PM
-    return start_time <= current_time <= end_time
+'''
 
 class VideoCamera:
     def __init__(self):
@@ -273,18 +263,6 @@ def serve_image(filepath):
     datasets_dir = 'datasets'
     return send_from_directory(datasets_dir, filepath, as_attachment=False)
     
-def get_user_picture(name, grade_level, section):
-    """
-    Fetch the first picture of the recognized user.
-    """
-    user_folder = os.path.join('datasets', grade_level, section, name)
-    if os.path.isdir(user_folder):
-        images = [f for f in os.listdir(user_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        if images:
-            # Return the relative path for the image
-            return f'{grade_level}/{section}/{name}/{images[0]}'
-    return None  # Return None if no images found or user folder does not exist
-
 # Initialize a dictionary to store the last insertion time for each user
 last_insertion_times = {}
 
@@ -343,6 +321,43 @@ def smooth_bounding_box(current_box):
         return (avg_x, avg_y, avg_w, avg_h)
     return current_box
 
+import os
+
+def get_user_picture(name, grade_level=None, section=None, user_type=None):
+    """
+    Fetch the first picture of the recognized user.
+    For Students, Teachers, and Staff, returns the relative path of their first image.
+    """
+    # Normalize user_type to lowercase for consistency
+    user_type = user_type.lower() if user_type else None
+    
+    # Check user type and construct the appropriate path
+    if user_type == "student":
+        # For students, use grade_level and section to construct the folder path
+        user_folder = os.path.join('datasets', grade_level, section, name)
+    elif user_type == "teacher":
+        # For teachers, the folder is under 'datasets/teachers'
+        user_folder = os.path.join('datasets', 'teachers', name)
+    elif user_type == "staff":
+        # For staff, the folder is under 'datasets/staff'
+        user_folder = os.path.join('datasets', 'staff', name)
+    else:
+        # If user_type is None or unknown, return None
+        return None
+    
+    # Check if the user's folder exists
+    if os.path.isdir(user_folder):
+        # List all image files (case-insensitive for .jpg, .jpeg, .png)
+        images = [f for f in os.listdir(user_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        if images:
+            # Return the relative path for the first image
+            if user_type == "student":
+                return f'{grade_level}/{section}/{name}/{images[0]}'
+            else:
+                return f'{user_type}s/{name}/{images[0]}'
+    
+    return None  # Return None if no images found or user folder does not exist
+
 # Dictionary to store recognized users for the session
 recognized_users = {}
 
@@ -371,7 +386,8 @@ def generate_frames():
                 "datetime": None,
                 "grade_level": None,
                 "section": None,
-                "confidence": 0.0  # To store the confidence score
+                "confidence": 0.0,  # To store the confidence score
+                "user_type": "Unknown"
             }
 
             if len(faces) > 0:
@@ -388,8 +404,12 @@ def generate_frames():
 
                 # Set confidence threshold for unknown faces (e.g., 0.5)
                 confidence_threshold = 0.6
-
-                name = label_encoder.inverse_transform([max_prob_index])[0] if max_prob >= confidence_threshold else "Unknown"
+            
+                if max_prob >= confidence_threshold:
+                    name = label_encoder.inverse_transform([max_prob_index])[0]
+                else:
+                    name = "Unknown"
+                    current_detection["picture_path"] = None
 
                 # Prevent showing "Unknown" after a successful recognition
                 if name != "Unknown":
@@ -422,28 +442,40 @@ def generate_frames():
                     current_detection["confidence"] = max_prob
                     current_user_name = name
 
-                    # Look for the user's corresponding folder
+                    # Look for the user's corresponding folder for students 
+                    user_type = "Unknown"    
                     grade_level, section = None, None
-                    for root, dirs, files in os.walk('datasets'):
-                        for dir in dirs:
-                            section_path = os.path.join(root, dir)
-                            for student_file in os.listdir(section_path):
-                                if name in student_file:
-                                    grade_level = os.path.basename(os.path.dirname(section_path))
-                                    section = dir
+                    # First, check if the user is a teacher or staff
+                    if os.path.exists(os.path.join('datasets', 'teachers', name)):
+                        user_type = "Teacher"
+                    elif os.path.exists(os.path.join('datasets', 'staffs', name)):
+                        user_type = "Staff"
+                    else:
+                        # If not teacher or staff, check for student
+                        for root, dirs, files in os.walk('datasets'):
+                            for dir in dirs:
+                                section_path = os.path.join(root, dir)
+                                for student_file in os.listdir(section_path):
+                                    if name in student_file:
+                                        grade_level = os.path.basename(os.path.dirname(section_path))
+                                        section = dir
+                                        user_type = "Student"
+                                        break
+                                if grade_level and section:
                                     break
-                            if grade_level and section:
-                                break
+                                
+                    print(user_type)  
+                    # If user is a student, set grade_level and section based on the folder structure
+                    current_detection["grade_level"] = grade_level if grade_level else ""
+                    current_detection["section"] = section if section else ""
 
-                    current_detection["grade_level"] = grade_level if grade_level else "Unknown"
-                    current_detection["section"] = section if section else "Unknown"
-                    current_detection["datetime"] = entry_datetime   # Include AM/PM
-
-                    # Fetch the user's picture path
-                    user_picture_path = get_user_picture(name, grade_level, section)
-                    current_detection["picture_path"] = user_picture_path
+                    user_picture_path = get_user_picture(name, grade_level, section, user_type)
+                    print(user_picture_path)
+                    # Fetch the user's picture path based on the user type
+                    current_detection["picture_path"] = user_picture_path if user_picture_path else "Unknown"
 
                     # Get current time in hours and minutes for time-based recognition
+                    current_detection["datetime"] = entry_datetime   
                     current_hour = now.hour
 
                     # Determine if it's morning (6:00 AM to 10:00 AM) or afternoon (3:00 PM to 6:00 PM)
@@ -454,32 +486,30 @@ def generate_frames():
                     if now - last_insertion_times[name] >= insert_interval:
 
                         # **Morning: Time-in (6:00 AM to 10:00 AM)**
-                        if 1 <= current_hour < 2:
+                        if 0 <= current_hour < 10:
                             print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
-
                             # Insert the time_in (with time_out = NULL)
                             async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"])
-                            upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
 
                         # **Afternoon: Time-out (3:00 PM to 6:00 PM)**
-                        elif 2 <= current_hour < 18:
+                        elif 15 <= current_hour < 24:
                             print(f"Recognized {name} for check-out (3:00 PM - 6:00 PM)")
 
                             # Update the time_out for the same day
                             current_time_str = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
                             async_insert_data(name, entry_datetime, current_time_str, current_detection["grade_level"], current_detection["section"])
-                            upsert_attendance(name, current_detection["grade_level"], current_detection["section"])
 
                         # Update the last insertion time regardless of whether it's a check-in or check-out
                         last_insertion_times[name] = now
+                        upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
 
                 detected_info.update(current_detection)
                 last_valid_detection = current_detection  # Update last valid detection
                 
                 # Fetch current user data in a separate thread (asynchronously)
                 threading.Thread(target=async_fetch_user_data, args=(name,)).start()
-
-
+               
+                
             else:
                 detected_info.update(last_valid_detection)
 
