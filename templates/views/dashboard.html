@@ -69,7 +69,29 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Total Users</div>
-                          <div class="stat-value">Loading...</div>
+                          <div class="stat-value" id="total-users-count">Loading...</div>
+                      </div>
+                      <div class="stat shadow rounded bg-white">
+                        <div class="stat-figure text-secondary">
+                          <div class="avatar">
+                            <div class="w-16">
+                              <img src="../static/img/attendance.png" alt="book"/>
+                            </div>
+                          </div>
+                        </div>                           
+                        <div class="stat-title">Total Attendance</div>
+                        <div class="stat-value" id="total-attendance-count">Loading...</div>
+                      </div>
+                      <div class="stat shadow rounded bg-white">
+                        <div class="stat-figure text-secondary">
+                          <div class="avatar">
+                            <div class="w-16">
+                              <img src="../static/img/attendance.png" alt="book"/>
+                            </div>
+                          </div>
+                        </div>                           
+                        <div class="stat-title">Daily Attendance</div>
+                        <div class="stat-value" id="daily-attendance-count">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -80,7 +102,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Students</div>
-                          <div class="stat-value" id="unique-student-count">Loading...</div>
+                          <div class="stat-value" id="unique-students-count">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -91,7 +113,7 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Teachers</div>
-                          <div class="stat-value">Loading...</div>
+                          <div class="stat-value" id="unique-teachers-count">Loading...</div>
                       </div>
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -102,19 +124,9 @@
                             </div>
                           </div>                           
                           <div class="stat-title">Staffs</div>
-                          <div class="stat-value">Loading...</div>
+                          <div class="stat-value" id="unique-staffs-count">Loading...</div>
                       </div>
-                      <div class="stat shadow rounded bg-white">
-                          <div class="stat-figure text-secondary">
-                            <div class="avatar">
-                              <div class="w-16">
-                                <img src="../static/img/attendance.png" alt="book"/>
-                              </div>
-                            </div>
-                          </div>                           
-                          <div class="stat-title">Total Attendance</div>
-                          <div class="stat-value">Loading...</div>
-                      </div>
+                     
                       <!--
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -127,17 +139,6 @@
                           <div class="stat-title">Total Absences</div>
                           <div class="stat-value">Loading...</div>
                       </div>-->
-                      <div class="stat shadow rounded bg-white">
-                          <div class="stat-figure text-secondary">
-                            <div class="avatar">
-                              <div class="w-16">
-                                <img src="../static/img/attendance.png" alt="book"/>
-                              </div>
-                            </div>
-                          </div>                           
-                          <div class="stat-title">Daily Attendance</div>
-                          <div class="stat-value">Loading...</div>
-                      </div>
                       <!--
                       <div class="stat shadow rounded bg-white">
                           <div class="stat-figure text-secondary">
@@ -154,52 +155,7 @@
                   </div>
                   <div class="bg-white rounded shadow p-4">
                       <h2>Monthly Data</h2>
-                      <canvas id="barChart"></canvas>
-                      <script>
-                          const labels = ['November', 'December', 'January', 'February', 'March', 'April', 'May']; 
-                          const data = {
-                              labels: labels,
-                              datasets: [{
-                                  label: 'Attendance Count',
-                                  data: [1200, 1259, 3480, 3481, 2256, 2255, 2340],
-                                  backgroundColor: [
-                                      'rgba(255, 99, 132, 0.2)',
-                                      'rgba(255, 159, 64, 0.2)',
-                                      'rgba(255, 205, 86, 0.2)',
-                                      'rgba(75, 192, 192, 0.2)',
-                                      'rgba(54, 162, 235, 0.2)',
-                                      'rgba(153, 102, 255, 0.2)',
-                                      'rgba(201, 203, 207, 0.2)'
-                                  ],
-                                  borderColor: [
-                                      'rgb(255, 99, 132)',
-                                      'rgb(255, 159, 64)',
-                                      'rgb(255, 205, 86)',
-                                      'rgb(75, 192, 192)',
-                                      'rgb(54, 162, 235)',
-                                      'rgb(153, 102, 255)',
-                                      'rgb(201, 203, 207)'
-                                  ],
-                                  borderWidth: 1
-                              }]
-                          };
-                  
-                          const config = {
-                              type: 'bar',
-                              data: data,
-                              options: {
-                                  responsive: true,
-                                  scales: {
-                                      y: {
-                                          beginAtZero: true
-                                      }
-                                  }
-                              },
-                          };
-                  
-                          const ctx = document.getElementById('barChart').getContext('2d');
-                          new Chart(ctx, config);
-                      </script>
+                      <canvas id="barChart"></canvas>   
                   </div>      
               </div>       
           </div>
@@ -245,6 +201,7 @@
                               <th>Status</th>
                               <th>Grade</th>
                               <th>Section</th>
+                              <th>User Type</th>
                               <th>Time In</th>
                               <th>Time Out</th>
                           </tr>
@@ -294,6 +251,7 @@
                               <th>Name</th>
                               <th>Grade</th>
                               <th>Section</th>
+                              <th>User Type</th>
                               <th>Total Attendance</th>
                               <th>Weekly Attendance</th>
                               <th>Week</th>

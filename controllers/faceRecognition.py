@@ -44,9 +44,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def insert_data(name, time_in, time_out, grade_level, section):
+def insert_data(name, time_in, time_out, grade_level, section, user_type):
     try:
-        print(f"Inserting data: {name}, {time_in}, {time_out}, {grade_level}, {section}")
+        print(f"Inserting data: {name}, {time_in}, {time_out}, {grade_level}, {section}, {user_type}")
         
         # If time_out is empty, set it to None to indicate that the user hasn't timed out yet
         time_out = time_out if time_out else None
@@ -84,9 +84,9 @@ def insert_data(name, time_in, time_out, grade_level, section):
             # Insert a new record for the person with time_in and NULL time_out
             print(f"Inserting new time_in for {name} at {time_in}.")
             c.execute("""
-                INSERT INTO attendance (name, time_in, time_out, grade_level, section) 
-                VALUES (?, ?, NULL, ?, ?)
-            """, (name, time_in, grade_level, section))
+                INSERT INTO attendance (name, time_in, time_out, grade_level, section, user_type) 
+                VALUES (?, ?, NULL, ?, ?, ?)
+            """, (name, time_in, grade_level, section, user_type))
             conn.commit()
             print(f"Successfully inserted time_in for {name}.")
 
@@ -95,8 +95,8 @@ def insert_data(name, time_in, time_out, grade_level, section):
     finally:
         conn.close()
         
-def async_insert_data(name, time_in, time_out, grade_level, section):
-    threading.Thread(target=insert_data, args=(name, time_in, time_out, grade_level, section)).start()
+def async_insert_data(name, time_in, time_out, grade_level, section, user_type):
+    threading.Thread(target=insert_data, args=(name, time_in, time_out, grade_level, section, user_type)).start()
 
 def upsert_attendance(name, grade_level, section, user_type):
     try:
@@ -132,8 +132,7 @@ def upsert_attendance(name, grade_level, section, user_type):
             ON CONFLICT(name) DO UPDATE SET
                 total_attendance = ?,
                 weekly_attendance = ?,
-                week = strftime('%W', 'now'),
-                date_created = ?
+                week = strftime('%W', 'now')      
         """, (name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp, total_attendance, weekly_attendance, formatted_timestamp))
 
         conn.commit()
@@ -489,7 +488,7 @@ def generate_frames():
                         if 0 <= current_hour < 10:
                             print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
                             # Insert the time_in (with time_out = NULL)
-                            async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"])
+                            async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"], user_type)
 
                         # **Afternoon: Time-out (3:00 PM to 6:00 PM)**
                         elif 15 <= current_hour < 24:
@@ -497,7 +496,7 @@ def generate_frames():
 
                             # Update the time_out for the same day
                             current_time_str = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
-                            async_insert_data(name, entry_datetime, current_time_str, current_detection["grade_level"], current_detection["section"])
+                            async_insert_data(name, entry_datetime, current_time_str, current_detection["grade_level"], current_detection["section"], user_type)
 
                         # Update the last insertion time regardless of whether it's a check-in or check-out
                         last_insertion_times[name] = now

@@ -14,8 +14,8 @@ def create_table():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            grade_level TEXT NOT NULL,
-            section TEXT NOT NULL,
+            grade_level TEXT,
+            section TEXT,
             user_type TEXT NOT NULL,
             total_attendance INTEGER DEFAULT 0,
             weekly_attendance INTEGER,

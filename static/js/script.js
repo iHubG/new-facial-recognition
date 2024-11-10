@@ -95,8 +95,9 @@ function renderUsers(users) {
         row.insertCell(2).innerText = user.status || "Present"; // Default status if missing
         row.insertCell(3).innerText = user.grade_level;
         row.insertCell(4).innerText = user.section;
-        row.insertCell(5).innerText = user.time_in;
-        row.insertCell(6).innerText = user.time_out;
+        row.insertCell(5).innerText = user.user_type;
+        row.insertCell(6).innerText = user.time_in;
+        row.insertCell(7).innerText = user.time_out;
     });
 }
 
@@ -167,8 +168,9 @@ function exportToExcelAttendance() {
         status: row.cells[2].innerText,
         grade: row.cells[3].innerText,
         section: row.cells[4].innerText,
-        time_in: row.cells[5].innerText,
-        time_out: row.cells[6].innerText,
+        user_type: row.cells[5].innerText,
+        time_in: row.cells[6].innerText,
+        time_out: row.cells[7].innerText,
     }));
 
     const ws = XLSX.utils.json_to_sheet(formattedLogs);
@@ -217,10 +219,11 @@ function renderRegisteredUsers(users) {
         row.insertCell(1).innerText = user.name;
         row.insertCell(2).innerText = user.grade_level;
         row.insertCell(3).innerText = user.section;
-        row.insertCell(4).innerText = user.total_attendance;
-        row.insertCell(5).innerText = user.weekly_attendance;
-        row.insertCell(6).innerText = user.week;
-        row.insertCell(7).innerText = user.date_created;
+        row.insertCell(4).innerText = user.user_type;
+        row.insertCell(5).innerText = user.total_attendance;
+        row.insertCell(6).innerText = user.weekly_attendance;
+        row.insertCell(7).innerText = user.week;
+        row.insertCell(8).innerText = user.date_created;
     });
 }
 
@@ -271,6 +274,7 @@ function exportToExcelRegisteredUsers() {
         name: user.name,
         grade_level: user.grade_level,
         section: user.section,
+        user_type: user.user_type,
         total_attendance: user.total_attendance,
         weekly_attendance: user.weekly_attendance,
         week: user.week,
@@ -408,11 +412,8 @@ function exportToExcel() {
     XLSX.writeFile(wb, "activity_logs.xlsx");
 }
 
-
-
 // Call the function when the page loads
 document.addEventListener('DOMContentLoaded', fetchAllLogs);
-
 
 function confirmBackup() {
     const form = document.createElement('form');
@@ -423,21 +424,107 @@ function confirmBackup() {
     backupDatabase.close(); // Close the modal
 }
 
-// Function to fetch the count of unique students
-async function fetchUniqueStudentCount() {
+// Function to fetch the count of unique students, teachers, staff, and total users
+async function fetchAllUserCounts() {
     try {
-    const response = await fetch('/admin/count_all_users'); // Updated URL to match the new endpoint
-    const data = await response.json();
-    document.getElementById('unique-student-count').textContent = data.unique_users_count;
+        // Fetch data from the new endpoint
+        const response = await fetch('/admin/count_all_users');
+        const data = await response.json();
+
+        // Update the HTML elements with the respective counts
+        document.getElementById('unique-students-count').textContent = data.students_count;
+        document.getElementById('unique-teachers-count').textContent = data.teachers_count;
+        document.getElementById('unique-staffs-count').textContent = data.staffs_count;
+        document.getElementById('total-users-count').textContent = data.total_users_count;
+
     } catch (error) {
-    console.error('Error fetching student count:', error);
-    document.getElementById('unique-student-count').textContent = 'Error';
+        console.error('Error fetching user counts:', error);
+        // Show an error message in case of failure
+        document.getElementById('unique-students-count').textContent = 'Error';
+        document.getElementById('unique-teachers-count').textContent = 'Error';
+        document.getElementById('unique-staffs-count').textContent = 'Error';
+        document.getElementById('total-users-count').textContent = 'Error';
     }
 }
 
-// Call the function to fetch the count when the page loads
-window.onload = fetchUniqueStudentCount;
+// Function to fetch total and daily attendance counts
+async function fetchAttendanceCounts() {
+    try {
+        // Fetch data from the count_attendance endpoint
+        const response = await fetch('/admin/count_attendance');
+        const data = await response.json();
 
+        // Update the HTML elements with the respective counts
+        document.getElementById('total-attendance-count').textContent = data.total_attendance;
+        document.getElementById('daily-attendance-count').textContent = data.daily_attendance;
+
+    } catch (error) {
+        console.error('Error fetching attendance counts:', error);
+        // Show an error message in case of failure
+        document.getElementById('total-attendance-count').textContent = 'Error';
+        document.getElementById('daily-attendance-count').textContent = 'Error';
+    }
+}
+
+// Function to fetch monthly attendance data from the Flask backend
+async function fetchMonthlyAttendanceData() {
+    try {
+        // Fetch data from the backend
+        const response = await fetch('/admin/monthly_attendance');
+        const data = await response.json();
+
+        // Prepare data for the chart
+        const labels = data.labels;  // Full month names
+        const attendanceCounts = data.attendance_counts;  // The attendance counts
+
+        // Generate a random color for each bar
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Generate random colors for the bars
+        const colors = labels.map(() => getRandomColor());
+
+        // Get the context of the canvas element
+        const ctx = document.getElementById('barChart').getContext('2d');
+
+        // Create a new Chart.js bar chart
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,  // X-axis labels (month names)
+                datasets: [{
+                    label: 'Attendance Count',
+                    data: attendanceCounts,  // Y-axis data (attendance counts)
+                    backgroundColor: colors,  // Random bar colors
+                    borderColor: colors,  // Border color for each bar
+                    borderWidth: 1  // Border width for the bars
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true  // Start Y-axis at 0
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching monthly attendance:', error);
+    }
+}
+
+window.onload = function() {
+    fetchAllUserCounts();
+    fetchAttendanceCounts();
+    fetchMonthlyAttendanceData();
+};
 
 function printAttendance() {
     const table = document.getElementById('attendanceTable');

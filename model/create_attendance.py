@@ -16,6 +16,7 @@ def create_table():
             name TEXT NOT NULL,  
             section TEXT, 
             grade_level TEXT,
+            user_type TEXT NOT NULL,
             time_in TEXT,
             time_out TEXT
         )
