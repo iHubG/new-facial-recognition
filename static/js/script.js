@@ -151,8 +151,14 @@ function sortUsers() {
         sortedUsers = [...allUsers].sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'id') {
         sortedUsers = [...allUsers].sort((a, b) => a.id - b.id);
+    } else if (sortBy === 'student') {
+        sortedUsers = [...allUsers].filter(a => a.user_type === "Student");
+    } else if (sortBy === 'teacher') {
+        sortedUsers = [...allUsers].filter(a => a.user_type === "Teacher");
+    } else if (sortBy === 'staff') {
+        sortedUsers = [...allUsers].filter(a => a.user_type === "Staff");
     } else {
-        return; // No sorting if the default option is selected
+        return; 
     }
 
     renderUsers(sortedUsers);
@@ -259,10 +265,16 @@ function sortRegisteredUsers() {
     } else if (sortBy === 'name') {
         sortedUsers = [...registeredUsers].sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'id') {
-        sortedUsers = [...registeredUsers].sort((a, b) => a.id - b.id); // Sort by ID
+        sortedUsers = [...registeredUsers].sort((a, b) => a.id - b.id);
+    } else if (sortBy === 'student') {
+        sortedUsers = [...registeredUsers].filter(a => a.user_type === "Student");
+    } else if (sortBy === 'teacher') {
+        sortedUsers = [...registeredUsers].filter(a => a.user_type === "Teacher");
+    } else if (sortBy === 'staff') {
+        sortedUsers = [...registeredUsers].filter(a => a.user_type === "Staff");
     } else {
-        return; // No sorting if the default option is selected
-    }
+        return;  
+    }    
 
     renderRegisteredUsers(sortedUsers); // Render the sorted users
 }
