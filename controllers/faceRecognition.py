@@ -104,7 +104,7 @@ def upsert_attendance(name, grade_level, section, user_type):
         c = conn.cursor()
 
         # Count total attendance from the users table (all entries)
-        c.execute("""
+        c.execute(""" 
             SELECT COUNT(*) AS total_attendance 
             FROM attendance 
             WHERE name = ?
@@ -113,10 +113,10 @@ def upsert_attendance(name, grade_level, section, user_type):
 
         # Count weekly attendance from the users table (all entries in the current week)
         start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
-        c.execute("""
+        c.execute(""" 
             SELECT COUNT(*) AS weekly_attendance 
             FROM attendance 
-            WHERE name = ? AND time_in >= ?
+            WHERE name = ? AND time_in >= ? 
         """, (name, start_of_week.strftime('%m/%d/%Y 00:00:00')))
         weekly_attendance = c.fetchone()[0] or 0  # Default to 0 if None
 
@@ -126,14 +126,17 @@ def upsert_attendance(name, grade_level, section, user_type):
         formatted_timestamp = now.strftime('%m/%d/%Y %I:%M:%S %p')  # Format to 12-hour clock with AM/PM
 
         # Insert or update the attendance record based on the counts
-        c.execute("""
+        c.execute(""" 
             INSERT INTO users (name, grade_level, section, user_type, total_attendance, weekly_attendance, week, date_created)
             VALUES (?, ?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
             ON CONFLICT(name) DO UPDATE SET
                 total_attendance = ?,
                 weekly_attendance = ?,
-                week = strftime('%W', 'now')      
-        """, (name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp, total_attendance, weekly_attendance, formatted_timestamp))
+                week = strftime('%W', 'now')
+        """, (
+            name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp,
+            total_attendance, weekly_attendance
+        ))
 
         conn.commit()
         print(f"Successfully updated attendance for {name}.")
@@ -251,11 +254,47 @@ def async_fetch_user_data(name):
         response = requests.get(f'http://127.0.0.1:5000/user/get_all_users_data/{name}')
         if response.ok:
             user_data = response.json()
-            # Process user_data here if needed
         else:
             print("Failed to fetch user data")
     except Exception as e:
         print(f"Error fetching user data: {e}")
+
+@faceRecognition_bp.route('/attendance/<string:name>', methods=['GET'])
+def get_attendance(name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get attendance data from the attendance table
+    cursor.execute("SELECT total_attendance, weekly_attendance FROM users WHERE name = ?", (name,))
+    attendance_data = cursor.fetchone()
+
+    # Set defaults if no data found
+    if attendance_data:
+        total_attendance = attendance_data['total_attendance']
+        weekly_attendance = attendance_data['weekly_attendance']
+    else:
+        total_attendance = 0
+        weekly_attendance = 0
+
+    conn.close()
+
+    return jsonify({
+        'total_attendance': total_attendance,
+        'weekly_attendance': weekly_attendance
+    })
+    
+def async_fetch_attendance(name):
+    try:
+        response = requests.get(f'http://127.0.0.1:5000/user/attendance/{name}')
+        if response.ok:
+            attendance_data = response.json()
+            total_attendance = attendance_data['total_attendance']
+            weekly_attendance = attendance_data['weekly_attendance']
+            #print(f"Fetched attendance for {name}: Total: {total_attendance}, Weekly: {weekly_attendance}")
+        else:
+            print("Failed to fetch attendance data")
+    except Exception as e:
+        print(f"Error fetching attendance data: {e}")
 
 @faceRecognition_bp.route('/datasets/<path:filepath>')
 def serve_image(filepath):
@@ -463,13 +502,13 @@ def generate_frames():
                                 if grade_level and section:
                                     break
                                 
-                    print(user_type)  
+                    #print(user_type)  
                     # If user is a student, set grade_level and section based on the folder structure
                     current_detection["grade_level"] = grade_level if grade_level else ""
                     current_detection["section"] = section if section else ""
 
                     user_picture_path = get_user_picture(name, grade_level, section, user_type)
-                    print(user_picture_path)
+                    #print(user_picture_path)
                     # Fetch the user's picture path based on the user type
                     current_detection["picture_path"] = user_picture_path if user_picture_path else "Unknown"
 
@@ -507,7 +546,7 @@ def generate_frames():
                 
                 # Fetch current user data in a separate thread (asynchronously)
                 threading.Thread(target=async_fetch_user_data, args=(name,)).start()
-               
+                threading.Thread(target=async_fetch_attendance, args=(name,)).start()
                 
             else:
                 detected_info.update(last_valid_detection)
@@ -519,30 +558,6 @@ def generate_frames():
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        
-@faceRecognition_bp.route('/attendance/<string:name>', methods=['GET'])
-def get_attendance(name):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Get attendance data from the attendance table
-    cursor.execute("SELECT total_attendance, weekly_attendance FROM users WHERE name = ?", (name,))
-    attendance_data = cursor.fetchone()
-
-    # Set defaults if no data found
-    if attendance_data:
-        total_attendance = attendance_data['total_attendance']
-        weekly_attendance = attendance_data['weekly_attendance']
-    else:
-        total_attendance = 0
-        weekly_attendance = 0
-
-    conn.close()
-
-    return jsonify({
-        'total_attendance': total_attendance,
-        'weekly_attendance': weekly_attendance
-    })
 
 @faceRecognition_bp.route('/current_user', methods=['GET'])
 def current_user(): 

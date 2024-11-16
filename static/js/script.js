@@ -161,7 +161,7 @@ function sortUsers() {
         return; 
     }
 
-    renderUsers(sortedUsers);
+    renderUsers(sortedUsers); 
 }
 
 function exportToExcelAttendance() {
