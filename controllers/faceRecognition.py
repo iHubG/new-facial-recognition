@@ -242,7 +242,7 @@ def get_user_data(name):
         FROM attendance 
         WHERE name = ? 
         ORDER BY id DESC  
-        LIMIT 5
+        LIMIT 10
     '''
     users = conn.execute(query, (name,)).fetchall()
     conn.close()
@@ -539,12 +539,13 @@ def generate_frames():
 
                         # Update the last insertion time regardless of whether it's a check-in or check-out
                         last_insertion_times[name] = now
-                        upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
+                        
 
                 detected_info.update(current_detection)
                 last_valid_detection = current_detection  # Update last valid detection
                 
                 # Fetch current user data in a separate thread (asynchronously)
+                upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
                 threading.Thread(target=async_fetch_user_data, args=(name,)).start()
                 threading.Thread(target=async_fetch_attendance, args=(name,)).start()
                 
