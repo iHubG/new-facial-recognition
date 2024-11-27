@@ -359,8 +359,6 @@ def smooth_bounding_box(current_box):
         return (avg_x, avg_y, avg_w, avg_h)
     return current_box
 
-import os
-
 def get_user_picture(name, grade_level=None, section=None, user_type=None):
     """
     Fetch the first picture of the recognized user.
@@ -378,7 +376,7 @@ def get_user_picture(name, grade_level=None, section=None, user_type=None):
         user_folder = os.path.join('datasets', 'teachers', name)
     elif user_type == "staff":
         # For staff, the folder is under 'datasets/staff'
-        user_folder = os.path.join('datasets', 'staff', name)
+        user_folder = os.path.join('datasets', 'staffs', name)
     else:
         # If user_type is None or unknown, return None
         return None
@@ -402,6 +400,179 @@ recognized_users = {}
 current_user_name = "Unknown"
 
 # Insert or update data based on time-based conditions (morning and afternoon)
+def generate_frames():
+    global detected_info, current_user_name
+    last_valid_detection = detected_info.copy()
+    last_recognition_time = time.time()  # Initialize the last recognition time
+    recognition_cooldown = 2  # Set cooldown period in seconds
+
+    while camera.running:
+        frame = camera.get_frame()
+        if frame is None:
+            continue
+
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Remove the blink verification (commenting the following line)
+        # if is_blinking(frame):
+        #    ... (rest of the code inside the blink check)
+
+        # Now, without the blink check, proceed directly to face recognition
+        faces = embedder.extract(rgb_frame, threshold=0.95)
+
+        current_detection = {
+            "name": "Unknown",
+            "datetime": None,
+            "grade_level": None,
+            "section": None,
+            "confidence": 0.0,  # To store the confidence score
+            "user_type": "Unknown"
+        }
+
+        if len(faces) > 0:
+            current_time = time.time()  # Get the current time
+
+            # Process the first detected face
+            res = faces[0]
+            face_embedding = np.array(res['embedding']).reshape(1, -1)
+
+            # Predict using SVM and get the probability predictions
+            probabilities = clf.predict_proba(face_embedding)
+            max_prob_index = np.argmax(probabilities)
+            max_prob = probabilities[0][max_prob_index]
+
+            # Set confidence threshold for unknown faces (e.g., 0.5)
+            confidence_threshold = 0.6
+        
+            if max_prob >= confidence_threshold:
+                name = label_encoder.inverse_transform([max_prob_index])[0]
+            else:
+                name = "Unknown"
+                current_detection["picture_path"] = None
+
+            # Prevent showing "Unknown" after a successful recognition
+            if name != "Unknown":
+                recognized_users[tuple(res['box'])] = name  # Track the recognized user
+                last_recognition_time = current_time  # Update recognition time
+            else:
+                # Check if this face was recognized before (within the session)
+                if tuple(res['box']) in recognized_users:
+                    name = recognized_users[tuple(res['box'])]  # Use previously recognized name
+
+            # Smooth the bounding box coordinates
+            x, y, w, h = res['box']
+            smoothed_box = smooth_bounding_box((x, y, w, h))
+            x, y, w, h = smoothed_box
+
+            box_color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)  # Green for known, Red for unknown
+            cv2.rectangle(frame, (x, y), (x + w, y + h), box_color, 2)
+            cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+
+            # Show accuracy rate at the bottom of the box formatted as a percentage
+            accuracy_percentage = max_prob * 100  # Convert to percentage
+            cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+
+            # Current date and time
+            now = datetime.now()
+            entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
+
+            if name != "Unknown":
+                current_detection["name"] = name
+                current_detection["confidence"] = max_prob
+                current_user_name = name
+
+                # Look for the user's corresponding folder for students 
+                user_type = "Unknown"    
+                grade_level, section = None, None
+                # First, check if the user is a teacher or staff
+                if os.path.exists(os.path.join('datasets', 'teachers', name)):
+                    user_type = "Teacher"
+                elif os.path.exists(os.path.join('datasets', 'staffs', name)):
+                    user_type = "Staff"
+                else:
+                    # If not teacher or staff, check for student
+                    for root, dirs, files in os.walk('datasets'):
+                        for dir in dirs:
+                            section_path = os.path.join(root, dir)
+                            for student_file in os.listdir(section_path):
+                                if name in student_file:
+                                    grade_level = os.path.basename(os.path.dirname(section_path))
+                                    section = dir
+                                    user_type = "Student"
+                                    break
+                            if grade_level and section:
+                                break
+                            
+                # If user is a student, set grade_level and section based on the folder structure
+                current_detection["grade_level"] = grade_level if grade_level else ""
+                current_detection["section"] = section if section else ""
+
+                user_picture_path = get_user_picture(name, grade_level, section, user_type)
+                current_detection["picture_path"] = user_picture_path if user_picture_path else "Unknown"
+
+                # Get current time in hours and minutes for time-based recognition
+                current_detection["datetime"] = entry_datetime   
+                current_hour = now.hour
+
+                if name not in last_insertion_times:
+                    last_insertion_times[name] = now - insert_interval  # Set initial time
+
+                # Only insert or update if the time interval has passed
+                if now - last_insertion_times[name] >= insert_interval:
+
+                    # **Morning: Time-in (6:00 AM to 10:00 AM)**
+                    if 0 <= current_hour < 14:
+                        print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
+                        # Insert the time_in (with time_out = NULL)
+                        async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"], user_type)
+
+                    # **Afternoon: Time-out (3:00 PM to 6:00 PM)**
+                    elif 15 <= current_hour < 24:
+                        print(f"Recognized {name} for check-out (3:00 PM - 6:00 PM)")
+
+                        # Update the time_out for the same day
+                        current_time_str = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
+                        async_insert_data(name, entry_datetime, current_time_str, current_detection["grade_level"], current_detection["section"], user_type)
+
+                    # Update the last insertion time regardless of whether it's a check-in or check-out
+                    last_insertion_times[name] = now
+
+            detected_info.update(current_detection)
+            last_valid_detection = current_detection  # Update last valid detection
+
+            if name != "Unknown":
+                # Fetch current user data in a separate thread (asynchronously)
+                upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
+                threading.Thread(target=async_fetch_user_data, args=(name,)).start()
+                threading.Thread(target=async_fetch_attendance, args=(name,)).start()
+            else:
+                print('Unknown User Detected')
+        else:
+            detected_info.update(last_valid_detection)
+
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@faceRecognition_bp.route('/current_user', methods=['GET'])
+def current_user(): 
+    return jsonify({'name': current_user_name})
+
+@faceRecognition_bp.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@faceRecognition_bp.route('/get_detected_info')
+def get_detected_info():
+    if not camera_running:  # Check if the camera is running
+        return jsonify({"name": "Unknown", "datetime": None, "grade_level": None, "section": None})  # Default response
+    return jsonify(detected_info)
+
+    
+
+
+'''
 def generate_frames():
     global detected_info, current_user_name
     last_valid_detection = detected_info.copy()
@@ -524,7 +695,7 @@ def generate_frames():
                     if now - last_insertion_times[name] >= insert_interval:
 
                         # **Morning: Time-in (6:00 AM to 10:00 AM)**
-                        if 0 <= current_hour < 10:
+                        if 0 <= current_hour < 14:
                             print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
                             # Insert the time_in (with time_out = NULL)
                             async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"], user_type)
@@ -544,11 +715,13 @@ def generate_frames():
                 detected_info.update(current_detection)
                 last_valid_detection = current_detection  # Update last valid detection
                 
-                # Fetch current user data in a separate thread (asynchronously)
-                upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
-                threading.Thread(target=async_fetch_user_data, args=(name,)).start()
-                threading.Thread(target=async_fetch_attendance, args=(name,)).start()
-                
+                if name != "Unknown":
+                    # Fetch current user data in a separate thread (asynchronously)
+                    upsert_attendance(name, current_detection["grade_level"], current_detection["section"], user_type)
+                    threading.Thread(target=async_fetch_user_data, args=(name,)).start()
+                    threading.Thread(target=async_fetch_attendance, args=(name,)).start()
+                else:
+                    print('Unknown User Detected')
             else:
                 detected_info.update(last_valid_detection)
 
@@ -559,21 +732,4 @@ def generate_frames():
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-@faceRecognition_bp.route('/current_user', methods=['GET'])
-def current_user(): 
-    return jsonify({'name': current_user_name})
-
-@faceRecognition_bp.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@faceRecognition_bp.route('/get_detected_info')
-def get_detected_info():
-    if not camera_running:  # Check if the camera is running
-        return jsonify({"name": "Unknown", "datetime": None, "grade_level": None, "section": None})  # Default response
-    return jsonify(detected_info)
-
-    
-
-
+'''
