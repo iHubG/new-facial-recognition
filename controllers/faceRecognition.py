@@ -27,7 +27,7 @@ faceRecognition_bp = Blueprint('faceRecognition', __name__)
 
 # Initialize variables for last insertion time and interval
 insert_interval = timedelta(minutes=5)
-detected_info = {"name": None, "datetime": None, "grade_level": None, "section": None}  # Store additional info
+detected_info = {"name": None, "datetime": None, "grade_level": None, "section": None, "user_type": None}  # Store additional info
 
 # Load the trained SVM classifier and label encoder
 with open('svm_classifier_facenet.pkl', 'rb') as f:
@@ -103,7 +103,12 @@ def upsert_attendance(name, grade_level, section, user_type):
         conn = get_db_connection()
         c = conn.cursor()
 
-        # Count total attendance from the users table (all entries)
+        # Get the current timestamp in Philippine Time (PHT)
+        timezone = pytz.timezone('Asia/Manila')
+        now = datetime.now(timezone)
+        formatted_timestamp = now.strftime('%m/%d/%Y %I:%M:%S %p')  # Format to 12-hour clock with AM/PM
+
+        # Count total attendance from the attendance table (all entries)
         c.execute(""" 
             SELECT COUNT(*) AS total_attendance 
             FROM attendance 
@@ -111,7 +116,7 @@ def upsert_attendance(name, grade_level, section, user_type):
         """, (name,))
         total_attendance = c.fetchone()[0] or 0  # Default to 0 if None
 
-        # Count weekly attendance from the users table (all entries in the current week)
+        # Count weekly attendance from the attendance table (all entries in the current week)
         start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
         c.execute(""" 
             SELECT COUNT(*) AS weekly_attendance 
@@ -120,30 +125,37 @@ def upsert_attendance(name, grade_level, section, user_type):
         """, (name, start_of_week.strftime('%m/%d/%Y 00:00:00')))
         weekly_attendance = c.fetchone()[0] or 0  # Default to 0 if None
 
-        # Get the current timestamp in Philippine Time (PHT)
-        timezone = pytz.timezone('Asia/Manila')
-        now = datetime.now(timezone)
-        formatted_timestamp = now.strftime('%m/%d/%Y %I:%M:%S %p')  # Format to 12-hour clock with AM/PM
-
-        # Insert or update the attendance record based on the counts
+        # Check if the user already exists in the users table
         c.execute(""" 
-            INSERT INTO users (name, grade_level, section, user_type, total_attendance, weekly_attendance, week, date_created)
-            VALUES (?, ?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
-            ON CONFLICT(name) DO UPDATE SET
-                total_attendance = ?,
-                weekly_attendance = ?,
-                week = strftime('%W', 'now')
-        """, (
-            name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp,
-            total_attendance, weekly_attendance
-        ))
+            SELECT id FROM users WHERE name = ? 
+        """, (name,))
+        existing_user = c.fetchone()
+
+        if existing_user:
+            # User exists, update total_attendance, weekly_attendance, and week
+            print(f"Updating attendance for {name}.")
+            c.execute("""
+                UPDATE users 
+                SET total_attendance = ?, weekly_attendance = ?, week = strftime('%W', 'now')
+                WHERE name = ?
+            """, (total_attendance, weekly_attendance, name))
+            print(f"Successfully updated attendance for {name}.")
+        else:
+            # User does not exist, insert new record
+            print(f"Inserting new attendance record for {name}.")
+            c.execute(""" 
+                INSERT INTO users (name, grade_level, section, user_type, total_attendance, weekly_attendance, week, date_created)
+                VALUES (?, ?, ?, ?, ?, ?, strftime('%W', 'now'), ?)
+            """, (name, grade_level, section, user_type, total_attendance, weekly_attendance, formatted_timestamp))
+            print(f"Successfully inserted attendance for {name}.")
 
         conn.commit()
-        print(f"Successfully updated attendance for {name}.")
+
     except Exception as e:
         print(f"Error updating attendance data: {e}")
     finally:
         conn.close()
+
 
 def get_user_data(name):
     try:
@@ -365,18 +377,18 @@ def get_user_picture(name, grade_level=None, section=None, user_type=None):
     For Students, Teachers, and Staff, returns the relative path of their first image.
     """
     # Normalize user_type to lowercase for consistency
-    user_type = user_type.lower() if user_type else None
+    #user_type = user_type.lower() if user_type else None
     
     # Check user type and construct the appropriate path
-    if user_type == "student":
+    if user_type == "Student":
         # For students, use grade_level and section to construct the folder path
         user_folder = os.path.join('datasets', grade_level, section, name)
-    elif user_type == "teacher":
+    elif user_type == "Teacher":
         # For teachers, the folder is under 'datasets/teachers'
-        user_folder = os.path.join('datasets', 'teachers', name)
-    elif user_type == "staff":
+        user_folder = os.path.join('datasets', 'Teachers', name)
+    elif user_type == "Staff":
         # For staff, the folder is under 'datasets/staff'
-        user_folder = os.path.join('datasets', 'staffs', name)
+        user_folder = os.path.join('datasets', 'Staffs', name)
     else:
         # If user_type is None or unknown, return None
         return None
@@ -387,7 +399,7 @@ def get_user_picture(name, grade_level=None, section=None, user_type=None):
         images = [f for f in os.listdir(user_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         if images:
             # Return the relative path for the first image
-            if user_type == "student":
+            if user_type == "Student":
                 return f'{grade_level}/{section}/{name}/{images[0]}'
             else:
                 return f'{user_type}s/{name}/{images[0]}'
@@ -442,7 +454,7 @@ def generate_frames():
             max_prob = probabilities[0][max_prob_index]
 
             # Set confidence threshold for unknown faces (e.g., 0.5)
-            confidence_threshold = 0.6
+            confidence_threshold = 0.80
         
             if max_prob >= confidence_threshold:
                 name = label_encoder.inverse_transform([max_prob_index])[0]
@@ -469,8 +481,10 @@ def generate_frames():
             cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
             # Show accuracy rate at the bottom of the box formatted as a percentage
-            accuracy_percentage = max_prob * 100  # Convert to percentage
-            cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+            if name != "Unknown":
+                accuracy_percentage = max_prob * 100  # Convert to percentage
+                cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+                print(f'Accuracy: {accuracy_percentage:.2f}%')
 
             # Current date and time
             now = datetime.now()
@@ -485,9 +499,9 @@ def generate_frames():
                 user_type = "Unknown"    
                 grade_level, section = None, None
                 # First, check if the user is a teacher or staff
-                if os.path.exists(os.path.join('datasets', 'teachers', name)):
+                if os.path.exists(os.path.join('datasets', 'Teachers', name)):
                     user_type = "Teacher"
-                elif os.path.exists(os.path.join('datasets', 'staffs', name)):
+                elif os.path.exists(os.path.join('datasets', 'Staffs', name)):
                     user_type = "Staff"
                 else:
                     # If not teacher or staff, check for student
@@ -506,6 +520,7 @@ def generate_frames():
                 # If user is a student, set grade_level and section based on the folder structure
                 current_detection["grade_level"] = grade_level if grade_level else ""
                 current_detection["section"] = section if section else ""
+                current_detection["user_type"] = user_type if user_type else ""
 
                 user_picture_path = get_user_picture(name, grade_level, section, user_type)
                 current_detection["picture_path"] = user_picture_path if user_picture_path else "Unknown"
@@ -566,7 +581,7 @@ def video_feed():
 @faceRecognition_bp.route('/get_detected_info')
 def get_detected_info():
     if not camera_running:  # Check if the camera is running
-        return jsonify({"name": "Unknown", "datetime": None, "grade_level": None, "section": None})  # Default response
+        return jsonify({"name": "Unknown", "datetime": None, "grade_level": None, "section": None, "user_type": None})  # Default response
     return jsonify(detected_info)
 
     
@@ -639,8 +654,10 @@ def generate_frames():
                 cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
 
                 # Show accuracy rate at the bottom of the box formatted as a percentage
-                accuracy_percentage = max_prob * 100  # Convert to percentage
-                cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+                if name != "Unknown":
+                    accuracy_percentage = max_prob * 100  # Convert to percentage
+                    cv2.putText(frame, f'Accuracy: {accuracy_percentage:.2f}%', (x, y + h + 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, box_color, 1)
+                    print(f'Accuracy: {accuracy_percentage:.2f}%')
 
                 # Current date and time
                 now = datetime.now()
@@ -655,9 +672,9 @@ def generate_frames():
                     user_type = "Unknown"    
                     grade_level, section = None, None
                     # First, check if the user is a teacher or staff
-                    if os.path.exists(os.path.join('datasets', 'teachers', name)):
+                    if os.path.exists(os.path.join('datasets', 'Teachers', name)):
                         user_type = "Teacher"
-                    elif os.path.exists(os.path.join('datasets', 'staffs', name)):
+                    elif os.path.exists(os.path.join('datasets', 'Staffs', name)):
                         user_type = "Staff"
                     else:
                         # If not teacher or staff, check for student
@@ -677,6 +694,7 @@ def generate_frames():
                     # If user is a student, set grade_level and section based on the folder structure
                     current_detection["grade_level"] = grade_level if grade_level else ""
                     current_detection["section"] = section if section else ""
+                    current_detection["user_type"] = user_type if user_type else ""          
 
                     user_picture_path = get_user_picture(name, grade_level, section, user_type)
                     #print(user_picture_path)

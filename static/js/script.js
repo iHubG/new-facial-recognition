@@ -56,12 +56,12 @@ let allUsers = []; // Store all fetched users
 
 // Customize sections for each grade
 const gradeSections = {
-    "grade_7": ["section_1", "section_2", "section_3"],
-    "grade_8": ["section_1", "section_4", "section_5"],
-    "grade_9": ["section_2", "section_6"],
-    "grade_10": ["section_3", "section_7"],
-    "grade_11": ["section_1", "section_2"],
-    "grade_12": ["section_1", "section_2"]
+    "Grade 7": ["Section 1", "Section 2"],
+    "Grade 8": ["Rizal", "Aguinaldo",],
+    "Grade 9": ["Masigasig", "Matapat", "Maligalig", "SPJ"],
+    "Grade 10": ["Love", "Faith", "Hope", "SPJ"],
+    "Grade 11": ["Humss", "TVL-A", "TVL-B", "HE"],
+    "Grade 12": ["Humss", "TVL I-A", "TVL II-B", "HE"]
 };
 
 function fetchAllUsers() {
@@ -301,12 +301,12 @@ function exportToExcelRegisteredUsers() {
 
 // Customize sections for each grade for registered users
 const gradeSectionsForRegisteredUsers = {
-    "grade_7": ["section_1", "section_2", "section_3"],
-    "grade_8": ["section_1", "section_4", "section_5"],
-    "grade_9": ["section_2", "section_6"],
-    "grade_10": ["section_3", "section_7"],
-    "grade_11": ["section_1", "section_2"],
-    "grade_12": ["section_1", "section_2"]
+    "Grade 7": ["Section 1", "Section 2"],
+    "Grade 8": ["Rizal", "Aguinaldo",],
+    "Grade 9": ["Masigasig", "Matapat", "Maligalig", "SPJ"],
+    "Grade 10": ["Love", "Faith", "Hope", "SPJ"],
+    "Grade 11": ["Humss", "TVL-A", "TVL-B", "HE"],
+    "Grade 12": ["Humss", "TVL I-A", "TVL II-B", "HE"]
 };
 
 // Update sections based on the selected grade for registered users

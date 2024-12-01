@@ -11,6 +11,7 @@ function fetchData() {
             // Update UI with detected info
             document.getElementById('detected-name').innerText = data.name || "Unknown";
             document.getElementById('detected-time').innerText = data.datetime || "";
+            document.getElementById('detected-user-type').innerText = data.user_type || "";
             const grade = data.grade_level || "";
             const section = data.section || "";
             document.getElementById('detected-grade-section').innerText = `${grade} ${section}`;
