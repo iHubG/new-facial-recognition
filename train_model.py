@@ -40,7 +40,7 @@ for root, dirs, files in os.walk('datasets'):
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                 # Generate multiple augmentations
-                for _ in range(19):  # Adjust the number of augmentations
+                for _ in range(25):  # Adjust the number of augmentations
                     augmented = transform(image=image)
                     img_aug = augmented['image']
 

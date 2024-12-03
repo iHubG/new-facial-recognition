@@ -250,7 +250,7 @@ def toggle_camera():
 def get_user_data(name):
     conn = get_db_connection()
     query = '''
-        SELECT name, time_in, time_out, section, grade_level 
+        SELECT name, time_in, time_out, section, grade_level, user_type 
         FROM attendance 
         WHERE name = ? 
         ORDER BY id DESC  
@@ -425,13 +425,8 @@ def generate_frames():
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Remove the blink verification (commenting the following line)
-        # if is_blinking(frame):
-        #    ... (rest of the code inside the blink check)
-
-        # Now, without the blink check, proceed directly to face recognition
         faces = embedder.extract(rgb_frame, threshold=0.95)
-
+        
         current_detection = {
             "name": "Unknown",
             "datetime": None,
@@ -454,7 +449,7 @@ def generate_frames():
             max_prob = probabilities[0][max_prob_index]
 
             # Set confidence threshold for unknown faces (e.g., 0.5)
-            confidence_threshold = 0.80
+            confidence_threshold = 0.85
         
             if max_prob >= confidence_threshold:
                 name = label_encoder.inverse_transform([max_prob_index])[0]
@@ -490,7 +485,7 @@ def generate_frames():
             now = datetime.now()
             entry_datetime = now.strftime("%m/%d/%Y %I:%M:%S %p")  # 12-hour format with AM/PM
 
-            if name != "Unknown":
+            if name != "Unknown" and accuracy_percentage > 90:
                 current_detection["name"] = name
                 current_detection["confidence"] = max_prob
                 current_user_name = name
@@ -536,13 +531,13 @@ def generate_frames():
                 if now - last_insertion_times[name] >= insert_interval:
 
                     # **Morning: Time-in (6:00 AM to 10:00 AM)**
-                    if 0 <= current_hour < 14:
+                    if 0 <= current_hour < 15:
                         print(f"Recognized {name} for check-in (6:00 AM - 10:00 AM)")
                         # Insert the time_in (with time_out = NULL)
                         async_insert_data(name, entry_datetime, None, current_detection["grade_level"], current_detection["section"], user_type)
 
                     # **Afternoon: Time-out (3:00 PM to 6:00 PM)**
-                    elif 15 <= current_hour < 24:
+                    elif 16 <= current_hour < 24:
                         print(f"Recognized {name} for check-out (3:00 PM - 6:00 PM)")
 
                         # Update the time_out for the same day

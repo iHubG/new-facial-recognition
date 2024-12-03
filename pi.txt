@@ -1,1 +1,0 @@
-cap = cv2.VideoCapture('v4l2:///dev/video0')

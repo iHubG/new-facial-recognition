@@ -1,0 +1,34 @@
+''' detected_faces = detect_and_extract_faces(rgb_frame)
+
+#from mtcnn import MTCNN
+
+# Initialize MTCNN for face detection
+detector = MTCNN()
+
+def detect_and_extract_faces(frame):
+    # Detect faces using MTCNN
+    faces = detector.detect_faces(frame)
+    detected_faces = []
+
+    for face in faces:
+        # Get the bounding box and keypoints of the detected face
+        x, y, w, h = face['box']
+        # Crop the face from the image
+        face_crop = frame[y:y+h, x:x+w]
+        # Extract the face embedding using FaceNet
+        embedding = embedder.extract(face_crop, threshold=0.95)
+
+        # Check if embedding is valid (non-empty and non-NaN)
+        if embedding and embedding[0]['embedding'] is not None:
+            embedding_array = embedding[0]['embedding']
+            if np.any(np.isnan(embedding_array)):
+                print(f"NaN detected in embedding for face at {x}, {y}")
+                embedding_array = np.nan_to_num(embedding_array)  # Replace NaNs with zeros
+            detected_faces.append({
+                'embedding': embedding_array,
+                'box': (x, y, w, h),
+            })
+        else:
+            print(f"Failed to extract valid embedding for face at {x}, {y}")
+
+    return detected_faces '''
