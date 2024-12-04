@@ -2,6 +2,8 @@ from flask import Flask, render_template, redirect, url_for
 from controllers.auth import auth_bp
 from controllers.dashboard import dashboard_bp
 from controllers.faceRecognition import faceRecognition_bp, camera
+from controllers.guide import guide_bp
+
 import ssl
 import os
 import secrets
@@ -27,6 +29,8 @@ app.secret_key = load_or_generate_secret_key()
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(dashboard_bp, url_prefix='/admin')
 app.register_blueprint(faceRecognition_bp, url_prefix='/user')
+app.register_blueprint(guide_bp, url_prefix='/guide')
+
 
 @app.route('/')
 def index():

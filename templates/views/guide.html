@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Guide</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+</head>
+<body class="bg-sky-100">
+    <a href="{{ url_for('index') }}" class="absolute top-0 right-0 w-fit p-1 px-4 border border-gray-300 bg-white rounded-full m-5 hover:bg-gray-100">Go to Home</a>
+    <div class="container w-full m-auto flex flex-col items-center justify-center h-screen font-sans">
+        <h1 class="text-2xl text-center">Admin Guide: How to Run and Close the System</h1>
+
+        <div class="text-center mt-5">
+            <h2 class="text-xl">How to Run the System</h2>
+            <p>Follow these steps to activate and run your system in the command prompt:</p>
+            <ol class="list-decimal text-left pl-5 mt-3">
+                <li>Navigate to your project folder:</li>
+                <pre class="bg-gray-200 p-2">cd C:\new-facial-recognition</pre>
+                <li>Activate the virtual environment:</li>
+                <pre class="bg-gray-200 p-2">Type with double quotation marks ".venv\Scripts\activate"</pre>
+                <li>Once activated, run the system</li>
+                <pre class="bg-gray-200 p-2">Type "flask run" or "python app.py"</pre>
+            </ol>
+        </div>
+
+        <div class="text-center mt-10">
+            <h2 class="text-xl">How to Close the System</h2>
+            <p>Follow these steps to deactivate the virtual environment and close the system:</p>
+            <ol class="list-decimal text-left pl-5 mt-3">
+                <li>To stop the system or server, press <strong>Ctrl + C</strong> in the command prompt.</li>
+                <li>To deactivate the virtual environment:</li>
+                <pre class="bg-gray-200 p-2">Type "deactivate"</pre>
+            </ol>
+        </div>
+
+       
+    </div>
+</body>
+</html>
